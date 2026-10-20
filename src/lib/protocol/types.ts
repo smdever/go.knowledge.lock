@@ -68,6 +68,7 @@ export interface Attestation {
   signatureAlgorithm?: SignatureAlgorithm;
   signature?: string;          // Hex or base64 signature
   publicKey?: string;          // Public key or DID to verify attestation signature
+  isLive?: boolean;            // True if generated via live frontier API call
 }
 
 /**
