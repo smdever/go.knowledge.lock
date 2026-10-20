@@ -1,36 +1,35 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Knowledge Lock demo
 
-## Getting Started
+A hosted demo of Knowledge Lock: business units, stakeholders and multiple AI models agree on what's true, and the
+agreed version is locked so every team and agent builds from the same signed-off source.
 
-First, run the development server:
+The demo follows one fictional scenario. Halden Bank is building an AI assistant for customer complaints, and
+Product, Compliance and Engineering must agree its requirements without breaking the bank's locked complaints policy.
+
+1. **Propose**: edit a draft set of requirements (or add one that quietly breaks policy).
+2. **Review**: Anthropic, OpenAI and Google models check the draft against the locked policy; three stakeholders sign off.
+3. **Lock**: when the sign-off rules pass, the content is hashed (RFC 8785 canonical JSON, SHA-256), signed (Ed25519)
+   and stored in an append-only table. Every approval is bound to the exact content hash it was given for.
+4. **Build from it**: an agent answers only from the locked record, a ticket is checked for drift, and a change creates
+   a new version that goes back through review and replaces the old one.
+
+## Run locally
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env.local    # add your API keys
+npm run dev                   # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Without `DATABASE_URL` the demo uses an in-memory store. To try the flow without API keys, run `npm run dev:stub`
+(fake model responses, clearly labelled, never used in production builds).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Check your keys and model IDs: `npm run check:models`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Layout
 
-## Learn More
+- `src/lib/protocol`: the Knowledge Lock protocol (types, canonical JSON, consensus rules, lock and verify). No dependencies.
+- `src/lib/demo`: the demo scenario, storage (Postgres or memory), model calls and the service layer.
+- `src/app`: pages (`/`, `/r/[id]` workspace, `/l/[lockId]` locked record) and API routes under `/api`.
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See [DEPLOY.md](DEPLOY.md) to put it online.

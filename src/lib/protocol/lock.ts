@@ -47,16 +47,16 @@ export async function createKnowledgeLock(
 ): Promise<KnowledgeLockBlock> {
   const crypto = options.cryptoProvider ?? defaultCryptoProvider;
   
-  // 1. Evaluate consensus rules
-  const evaluation = evaluateConsensus(options.attestations, options.policy);
+  // 1. Compute canonical hash of the knowledge payload
+  const canonicalHash = await computeCanonicalPayloadHash(options.payload, crypto);
+
+  // 2. Evaluate consensus rules against attestations given for this exact content
+  const evaluation = evaluateConsensus(options.attestations, options.policy, canonicalHash);
   if (!evaluation.passed) {
     throw new Error(
       `Cannot lock knowledge block: consensus threshold not reached. Failures: ${evaluation.failures.join("; ")}`
     );
   }
-
-  // 2. Compute canonical hash of the knowledge payload
-  const canonicalHash = await computeCanonicalPayloadHash(options.payload, crypto);
 
   const createdAt = Date.now();
   const lockedAt = createdAt;
@@ -108,7 +108,7 @@ export async function verifyKnowledgeLock(
   }
 
   // 2. Re-evaluate consensus against recorded policy and attestations
-  const evaluation = evaluateConsensus(block.consensus.attestations, block.consensus.policy);
+  const evaluation = evaluateConsensus(block.consensus.attestations, block.consensus.policy, computedHash);
   const consensusSatisfied = evaluation.passed;
   if (!consensusSatisfied) {
     errors.push(`Consensus policy violation: ${evaluation.failures.join("; ")}`);

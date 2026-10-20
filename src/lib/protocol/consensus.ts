@@ -5,11 +5,21 @@ import { Attestation, ConsensusPolicy, ConsensusEvaluationResult } from "./types
  * Pure function: Given attestations and a policy, computes whether consensus is met.
  */
 export function evaluateConsensus(
-  attestations: Attestation[],
-  policy: ConsensusPolicy
+  allAttestations: Attestation[],
+  policy: ConsensusPolicy,
+  subjectHash?: string
 ): ConsensusEvaluationResult {
   const failures: string[] = [];
   const warnings: string[] = [];
+
+  // When a subject hash is given, attestations bound to different content do not count.
+  const attestations = subjectHash
+    ? allAttestations.filter((a) => !a.subjectHash || a.subjectHash === subjectHash)
+    : allAttestations;
+  const stale = allAttestations.length - attestations.length;
+  if (stale > 0) {
+    warnings.push(`${stale} attestation(s) were given for a different version of the content and were ignored.`);
+  }
 
   const modelAttestations = attestations.filter((a) => a.attestorType === "model");
   const humanAttestations = attestations.filter((a) => a.attestorType === "human");
@@ -73,13 +83,19 @@ export function evaluateConsensus(
     avgHallucinationRisk = totalHallu / modelApprovals.length;
   }
 
-  if (avgFactuality < policy.modelRules.minAverageFactuality) {
+  if (
+    policy.modelRules.minAverageFactuality !== undefined &&
+    avgFactuality < policy.modelRules.minAverageFactuality
+  ) {
     failures.push(
       `Average model factuality score (${avgFactuality.toFixed(2)}) below required threshold (${policy.modelRules.minAverageFactuality.toFixed(2)})`
     );
   }
 
-  if (avgLogicalConsistency < policy.modelRules.minAverageLogicalConsistency) {
+  if (
+    policy.modelRules.minAverageLogicalConsistency !== undefined &&
+    avgLogicalConsistency < policy.modelRules.minAverageLogicalConsistency
+  ) {
     failures.push(
       `Average model logical consistency (${avgLogicalConsistency.toFixed(2)}) below required threshold (${policy.modelRules.minAverageLogicalConsistency.toFixed(2)})`
     );
@@ -120,7 +136,14 @@ export function evaluateConsensus(
     }
   }
 
-  if (modelRejections.length > 0) {
+  if (
+    policy.modelRules.maxModelRejections !== undefined &&
+    modelRejections.length > policy.modelRules.maxModelRejections
+  ) {
+    failures.push(
+      `${modelRejections.length} model(s) rejected the proposal; at most ${policy.modelRules.maxModelRejections} allowed.`
+    );
+  } else if (modelRejections.length > 0) {
     warnings.push(`${modelRejections.length} model(s) rejected or flagged the proposal.`);
   }
 
@@ -143,5 +166,6 @@ export function evaluateConsensus(
     },
     failures,
     warnings,
+    subjectHash,
   };
 }

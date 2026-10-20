@@ -43,8 +43,8 @@ export type AttestorType = "model" | "human" | "oracle" | "automated_test";
  * Model Evaluation Metrics
  */
 export interface EvaluationMetrics {
-  factuality: number;          // 0.0 - 1.0
-  logicalConsistency: number;  // 0.0 - 1.0
+  factuality?: number;         // 0.0 - 1.0
+  logicalConsistency?: number; // 0.0 - 1.0
   citationValidity?: number;   // 0.0 - 1.0
   hallucinationRisk?: number;  // 0.0 - 1.0 (0 is best)
   relevance?: number;          // 0.0 - 1.0
@@ -65,6 +65,8 @@ export interface Attestation {
   metrics: EvaluationMetrics;
   reasoning?: string;
   disagreements?: string[];
+  subjectHash?: string;        // Canonical hash of the payload this attestation was given for.
+                               // When present, it only counts towards consensus for that exact content.
   signatureAlgorithm?: SignatureAlgorithm;
   signature?: string;          // Hex or base64 signature
   publicKey?: string;          // Public key or DID to verify attestation signature
@@ -83,8 +85,9 @@ export interface ConsensusPolicy {
   modelRules: {
     minDistinctModels: number;      // e.g., 3 models required
     minDistinctProviders?: number;  // e.g., at least 2 distinct vendors (Google + Anthropic)
-    minAverageFactuality: number;   // e.g., 0.90
-    minAverageLogicalConsistency: number; // e.g., 0.90
+    minAverageFactuality?: number;  // e.g., 0.90 (omit to skip the check)
+    minAverageLogicalConsistency?: number; // e.g., 0.90 (omit to skip the check)
+    maxModelRejections?: number;    // e.g., 0: any model REJECT blocks consensus
     maxAllowedHallucinationRisk?: number; // e.g., 0.10
     requiredModels?: string[];      // specific models that must participate
   };
@@ -126,6 +129,7 @@ export interface ConsensusEvaluationResult {
   };
   failures: string[];
   warnings: string[];
+  subjectHash?: string;         // Content hash the evaluation was run against, when bound
 }
 
 /**
