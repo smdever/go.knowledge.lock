@@ -3,11 +3,16 @@ import type { KnowledgeLockBlock } from "@/lib/protocol";
 import type { DemoRecord } from "../types";
 import type { Store } from "./types";
 
+/** DATABASE_URL, or POSTGRES_URL as set by the Vercel Supabase/Neon integrations. */
+export function databaseUrl(): string | undefined {
+  return process.env.DATABASE_URL || process.env.POSTGRES_URL || undefined;
+}
+
 const g = globalThis as unknown as { __klSql?: postgres.Sql; __klSchema?: Promise<void> };
 
 function sql(): postgres.Sql {
   if (!g.__klSql) {
-    g.__klSql = postgres(process.env.DATABASE_URL as string, {
+    g.__klSql = postgres(databaseUrl() as string, {
       max: 3,
       idle_timeout: 20,
       prepare: false, // works with transaction-mode poolers (Neon, Supabase)
@@ -48,6 +53,12 @@ async function ensureSchema(): Promise<void> {
           key text PRIMARY KEY,
           count integer NOT NULL DEFAULT 0
         )`;
+      // Row-level security with no policies: hosts that expose tables over an HTTP API
+      // (e.g. Supabase) deny all access through it. The app's own connection owns the
+      // tables and is unaffected.
+      for (const table of ["kl_records", "kl_locks", "kl_supersessions", "kl_usage"]) {
+        await db.unsafe(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`);
+      }
       await db`
         CREATE OR REPLACE FUNCTION kl_forbid_change() RETURNS trigger AS $$
         BEGIN

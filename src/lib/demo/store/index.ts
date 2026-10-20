@@ -1,14 +1,14 @@
 import { memoryStore } from "./memory";
-import { postgresStore } from "./postgres";
+import { databaseUrl, postgresStore } from "./postgres";
 import type { Store } from "./types";
 
 export type { Store } from "./types";
 
-/** Postgres when DATABASE_URL is set, otherwise an in-memory store for local development. */
+/** Postgres when DATABASE_URL (or POSTGRES_URL) is set, otherwise an in-memory store for local development. */
 export function getStore(): Store {
-  return process.env.DATABASE_URL ? postgresStore : memoryStore;
+  return databaseUrl() ? postgresStore : memoryStore;
 }
 
 export function usingDatabase(): boolean {
-  return Boolean(process.env.DATABASE_URL);
+  return Boolean(databaseUrl());
 }

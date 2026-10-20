@@ -21,7 +21,7 @@ export function getAuthorityKey(): Promise<AuthorityKey> {
     if (privateKey && publicKey) {
       g.__klAuthority = Promise.resolve({ privateKey, publicKey, ephemeral: false });
     } else {
-      if (process.env.NODE_ENV === "production" && process.env.DATABASE_URL) {
+      if (process.env.NODE_ENV === "production" && (process.env.DATABASE_URL || process.env.POSTGRES_URL)) {
         console.warn(
           "[knowledge-lock] KL_AUTHORITY_* keys are not set. Using a throwaway key: locks will verify, but the signer changes on every restart."
         );
