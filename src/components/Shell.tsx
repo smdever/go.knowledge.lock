@@ -35,8 +35,20 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <div className={`rounded-2xl border border-ink/10 bg-bg/60 p-5 sm:p-6 ${className}`}>{children}</div>;
+export function Card({
+  children,
+  className = "",
+  tour,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  tour?: string;
+}) {
+  return (
+    <div data-tour={tour} className={`rounded-2xl border border-ink/10 bg-bg/60 p-5 sm:p-6 ${className}`}>
+      {children}
+    </div>
+  );
 }
 
 export function Pill({

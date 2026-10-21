@@ -28,6 +28,13 @@ export function stubResponse(provider: ProviderId, call: ModelCall): string {
     }
     return JSON.stringify({ decision: "APPROVE", summary: `[stub ${provider}] No conflicts with locked policy found.`, issues: [] });
   }
+  if (call.task === "fix") {
+    return JSON.stringify({
+      statement:
+        "If a customer asks for compensation, the assistant records the request on the case and explains that a case handler will decide on any redress.",
+      explanation: `[stub ${provider}] The assistant no longer offers payments itself; redress is left to a case handler, as P1 requires.`,
+    });
+  }
   if (call.task === "ask") {
     const q = text.slice(text.lastIndexOf("QUESTION:")).toLowerCase();
     if (/refund|payment|compensat/.test(q)) {

@@ -11,9 +11,9 @@ import {
 } from "@/lib/protocol";
 import { getAuthorityKey } from "./authority";
 import { callModelJson } from "./models/call";
-import { ASK_SCHEMA, DRIFT_SCHEMA, REVIEW_SCHEMA } from "./models/schemas";
+import { ASK_SCHEMA, DRIFT_SCHEMA, FIX_SCHEMA, REVIEW_SCHEMA } from "./models/schemas";
 import { isConfigured, providerConfigs, stubEnabled, type ProviderConfig } from "./models/config";
-import { ASK_SYSTEM, DRIFT_SYSTEM, REVIEW_SYSTEM, askUser, driftUser, reviewUser } from "./models/prompts";
+import { ASK_SYSTEM, DRIFT_SYSTEM, FIX_SYSTEM, REVIEW_SYSTEM, askUser, driftUser, fixUser, reviewUser } from "./models/prompts";
 import {
   DRAFT_REQUIREMENTS,
   DRAFT_TITLE,
@@ -26,7 +26,18 @@ import {
   STAKEHOLDERS,
 } from "./scenario";
 import { getStore } from "./store";
-import type { DemoRecord, IssueSeverity, IssueType, ModelReview, RecordView, ReviewIssue, Role } from "./types";
+import type {
+  DemoRecord,
+  FixSuggestion,
+  IssueSeverity,
+  IssueType,
+  ModelReview,
+  ProviderId,
+  RecordView,
+  Resolution,
+  ReviewIssue,
+  Role,
+} from "./types";
 
 export class DemoError extends Error {
   constructor(message: string, public status = 400) {
@@ -102,7 +113,13 @@ export function ensurePolicyLock(): Promise<string> {
 
 // ---------- Records ----------
 
-function buildPayload(record: Pick<DemoRecord, "id" | "version" | "parentLockId">, title: string, claims: KnowledgeClaim[], policyLockId: string): KnowledgePayload {
+function buildPayload(
+  record: Pick<DemoRecord, "id" | "version" | "parentLockId">,
+  title: string,
+  claims: KnowledgeClaim[],
+  policyLockId: string,
+  resolutions: Resolution[] = []
+): KnowledgePayload {
   return {
     schemaVersion: "1.0.0",
     title,
@@ -115,6 +132,8 @@ function buildPayload(record: Pick<DemoRecord, "id" | "version" | "parentLockId"
       version: record.version,
       ...(record.parentLockId ? { parentLockId: record.parentLockId } : {}),
       policyLockId,
+      // How model objections were resolved on the way to this version. Signed along with the content.
+      ...(resolutions.length ? { resolutions } : {}),
     },
   };
 }
@@ -166,9 +185,45 @@ export async function createRecord(parentLockId?: string): Promise<DemoRecord> {
     payloadHash: await computeCanonicalPayloadHash(payload),
     attestations: [],
     modelReviews: [],
+    resolutions: [],
   };
   await store.saveRecord(record);
   return record;
+}
+
+/**
+ * Works out which current objections an edit resolved. A blocker raised against a requirement whose
+ * wording is gone from the new draft counts as reworded (something new at the same position) or removed.
+ */
+function resolvedBy(
+  record: DemoRecord,
+  next: string[],
+  hint?: { requirementId: string; provider: ProviderId }
+): Resolution[] {
+  const current = record.modelReviews.filter((r) => r.status === "ok" && r.subjectHash === record.payloadHash);
+  const oldClaims = record.payload.claims;
+  const out: Resolution[] = [];
+  for (const [index, claim] of oldClaims.entries()) {
+    const raised = current.flatMap((r) =>
+      r.issues
+        .filter((i) => i.requirementId === claim.id && i.severity === "blocker")
+        .map((i) => ({ provider: r.provider, type: i.type, detail: i.detail, policyRef: i.policyRef }))
+    );
+    if (raised.length === 0 || next.includes(claim.statement)) continue;
+    const replacement = next[index];
+    const reworded = replacement !== undefined && !oldClaims.some((c) => c.statement === replacement);
+    out.push({
+      at: Date.now(),
+      requirementId: claim.id,
+      originalStatement: claim.statement,
+      raisedBy: [...new Set(raised.map((r) => r.provider))],
+      issues: raised.map((r) => ({ ...r, detail: r.detail.slice(0, 300) })),
+      outcome: reworded ? "reworded" : "removed",
+      ...(reworded ? { newStatement: replacement } : {}),
+      ...(reworded && hint?.requirementId === claim.id ? { suggestedBy: hint.provider } : {}),
+    });
+  }
+  return out;
 }
 
 function assertDraft(record: DemoRecord) {
@@ -176,7 +231,10 @@ function assertDraft(record: DemoRecord) {
 }
 
 /** Replaces the requirements. Reviews and sign-offs given for the old content no longer apply. */
-export async function updateRecord(id: string, input: { title?: unknown; requirements?: unknown }): Promise<DemoRecord> {
+export async function updateRecord(
+  id: string,
+  input: { title?: unknown; requirements?: unknown; fix?: unknown }
+): Promise<DemoRecord> {
   const record = await getRecordOrThrow(id);
   assertDraft(record);
 
@@ -192,7 +250,14 @@ export async function updateRecord(id: string, input: { title?: unknown; require
 
   const claims = statements.map((statement: string, i: number) => ({ id: `R${i + 1}`, statement }));
   const policyLockId = String(record.payload.metadata?.policyLockId ?? (await ensurePolicyLock()));
-  record.payload = buildPayload(record, title, claims, policyLockId);
+  const fix = input.fix as { requirementId?: unknown; provider?: unknown } | undefined;
+  const hint =
+    fix && typeof fix.requirementId === "string" && ["anthropic", "openai", "google"].includes(String(fix.provider))
+      ? { requirementId: fix.requirementId, provider: fix.provider as ProviderId }
+      : undefined;
+  const resolutions = [...(record.resolutions ?? []), ...resolvedBy(record, statements, hint)].slice(-10);
+  record.resolutions = resolutions;
+  record.payload = buildPayload(record, title, claims, policyLockId, resolutions);
   const hash = await computeCanonicalPayloadHash(record.payload);
   if (hash !== record.payloadHash) {
     record.payloadHash = hash;
@@ -288,6 +353,42 @@ export async function runReview(id: string, ip: string): Promise<DemoRecord> {
   latest.updatedAt = Date.now();
   await getStore().saveRecord(latest);
   return latest;
+}
+
+/** Asks the model that objected to a requirement to propose compliant wording. Nothing is changed until accepted. */
+export async function suggestFix(id: string, input: { requirementId?: unknown; provider?: unknown }, ip: string): Promise<FixSuggestion> {
+  const record = await getRecordOrThrow(id);
+  assertDraft(record);
+  const target = record.payload.claims.find((c) => c.id === input.requirementId);
+  if (!target) throw new DemoError("Requirement not found.");
+  const reviews = record.modelReviews.filter((r) => r.status === "ok" && r.subjectHash === record.payloadHash);
+  const objecting = reviews.filter((r) => r.issues.some((i) => i.requirementId === target.id));
+  if (objecting.length === 0) throw new DemoError("No model raised an issue with this requirement.");
+  const requested = objecting.find((r) => r.provider === input.provider) ?? objecting[0];
+  const providers = providerConfigs().filter(isConfigured);
+  const provider = providers.find((p) => p.id === requested.provider) ?? pickAgentProvider();
+  const issues = (objecting.find((r) => r.provider === provider.id) ?? requested).issues.filter(
+    (i) => i.requirementId === target.id
+  );
+
+  await chargeModelCalls(ip, 1);
+  const raw = await callModelJson(provider, {
+    task: "fix",
+    schema: FIX_SCHEMA,
+    system: FIX_SYSTEM,
+    user: fixUser(POLICY_PAYLOAD.claims, record.payload.claims, target, issues),
+    maxTokens: 800,
+  });
+  const statement = String(raw.statement ?? "").trim().slice(0, MAX_STATEMENT);
+  if (!statement) throw new DemoError("The model did not propose any wording. Try again.", 502);
+  return {
+    requirementId: target.id,
+    statement,
+    explanation: String(raw.explanation ?? "").slice(0, 400),
+    provider: provider.id,
+    model: provider.model,
+    stub: !provider.apiKey,
+  };
 }
 
 export async function signOff(id: string, input: { role?: unknown; decision?: unknown; comment?: unknown }): Promise<DemoRecord> {

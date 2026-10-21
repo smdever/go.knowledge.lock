@@ -35,6 +35,27 @@ export interface ModelReview {
   stub?: boolean; // true when produced by the local test stub, never in production
 }
 
+/** How an objection raised by a model was resolved before locking. Part of the signed payload. */
+export interface Resolution {
+  at: number;
+  requirementId: string;
+  originalStatement: string;
+  raisedBy: ProviderId[];
+  issues: { provider: ProviderId; type: IssueType; detail: string; policyRef?: string }[];
+  outcome: "reworded" | "removed";
+  newStatement?: string;
+  suggestedBy?: ProviderId;
+}
+
+export interface FixSuggestion {
+  requirementId: string;
+  statement: string;
+  explanation: string;
+  provider: ProviderId;
+  model: string;
+  stub: boolean;
+}
+
 export interface DemoRecord {
   id: string;
   scenarioId: string;
@@ -48,6 +69,7 @@ export interface DemoRecord {
   payloadHash: string;
   attestations: Attestation[];
   modelReviews: ModelReview[];
+  resolutions?: Resolution[];
 }
 
 /** What the API returns for a record: the record plus a live consensus evaluation. */

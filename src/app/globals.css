@@ -54,3 +54,20 @@ body {
     scroll-behavior: smooth;
   }
 }
+
+/* Guided tour highlight */
+[data-tour-highlight] {
+  outline: 2px solid var(--text-accent);
+  outline-offset: 4px;
+  border-radius: 0.75rem;
+  animation: kl-tour-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes kl-tour-pulse {
+  0%, 100% { outline-color: var(--text-accent); }
+  50% { outline-color: color-mix(in srgb, var(--text-accent) 35%, transparent); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-tour-highlight] { animation: none; }
+}

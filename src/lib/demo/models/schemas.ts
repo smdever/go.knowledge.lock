@@ -79,3 +79,17 @@ export const DRIFT_SCHEMA: OutputSchema = {
     additionalProperties: false,
   },
 };
+
+export const FIX_SCHEMA: OutputSchema = {
+  name: "submit_fix",
+  description: "Submit a reworded requirement that resolves the objection.",
+  schema: {
+    type: "object",
+    properties: {
+      statement: { type: "string", description: "The reworded requirement." },
+      explanation: { type: "string", description: "One sentence on what changed and why it now complies." },
+    },
+    required: ["statement", "explanation"],
+    additionalProperties: false,
+  },
+};

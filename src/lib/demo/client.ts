@@ -1,6 +1,6 @@
 "use client";
 
-import type { RecordView } from "./types";
+import type { FixSuggestion, ProviderId, RecordView } from "./types";
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
@@ -16,8 +16,17 @@ export const api = {
   createRecord: (parentLockId?: string) =>
     request<RecordView>("/api/records", { method: "POST", body: JSON.stringify({ parentLockId }) }),
   getRecord: (id: string) => request<RecordView>(`/api/records/${id}`),
-  updateRecord: (id: string, title: string, requirements: string[]) =>
-    request<RecordView>(`/api/records/${id}`, { method: "PATCH", body: JSON.stringify({ title, requirements }) }),
+  updateRecord: (
+    id: string,
+    title: string,
+    requirements: string[],
+    fix?: { requirementId: string; provider: ProviderId }
+  ) => request<RecordView>(`/api/records/${id}`, { method: "PATCH", body: JSON.stringify({ title, requirements, fix }) }),
+  suggestFix: (id: string, requirementId: string, provider: ProviderId) =>
+    request<FixSuggestion>(`/api/records/${id}/suggest`, {
+      method: "POST",
+      body: JSON.stringify({ requirementId, provider }),
+    }),
   review: (id: string) => request<RecordView>(`/api/records/${id}/review`, { method: "POST" }),
   signOff: (id: string, role: string, decision: "APPROVE" | "REJECT", comment?: string) =>
     request<RecordView>(`/api/records/${id}/approve`, {

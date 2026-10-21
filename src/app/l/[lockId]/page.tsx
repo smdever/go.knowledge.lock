@@ -1,14 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Bot, Check, Lock, User, X } from "lucide-react";
+import { Bot, Check, Lock, ShieldCheck, User, X } from "lucide-react";
 import Shell, { Card, Pill, shortHash } from "@/components/Shell";
 import { Build, Verify } from "@/components/LockTools";
 import StartButton from "@/components/StartButton";
 import ScrollToTop from "@/components/ScrollToTop";
+import Tour from "@/components/Tour";
+import type { Resolution } from "@/lib/demo/types";
 import { getLockView } from "@/lib/demo/service";
 import { SAMPLE_QUESTIONS, SAMPLE_TICKET } from "@/lib/demo/scenario";
 
 export const dynamic = "force-dynamic";
+
+const PROVIDER_NAMES = { anthropic: "Anthropic", openai: "OpenAI", google: "Google" } as const;
 
 const fmt = (ms: number) =>
   new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/London" }).format(ms);
@@ -26,6 +30,7 @@ export default async function LockPage({
   if (!view) notFound();
   const { block, verification, supersededBy, isPolicy } = view;
   const version = Number(block.payload.metadata?.version ?? 1);
+  const resolutions = (block.payload.metadata?.resolutions as Resolution[] | undefined) ?? [];
   const people = block.consensus.attestations.filter((a) => a.attestorType === "human");
   const models = block.consensus.attestations.filter((a) => a.attestorType === "model");
 
@@ -79,6 +84,41 @@ export default async function LockPage({
             </ol>
           </Card>
 
+          {resolutions.length ? (
+            <Card>
+              <h2 className="flex items-center gap-2 font-bold">
+                <ShieldCheck className="h-4 w-4 text-good" /> Objections resolved before locking
+              </h2>
+              <p className="mt-1 text-sm text-ink/70">Part of the signed record, so the history can&apos;t be rewritten.</p>
+              <ul className="mt-4 space-y-4">
+                {resolutions.map((r, i) => (
+                  <li key={i} className="rounded-xl border border-ink/10 p-4 text-sm">
+                    <p>
+                      <span className="font-mono text-xs font-semibold text-accent">{r.requirementId}</span>{" "}
+                      <span className="text-ink/60 line-through decoration-bad/50">{r.originalStatement}</span>
+                    </p>
+                    <ul className="mt-2 space-y-1">
+                      {r.issues.map((issue, k) => (
+                        <li key={k} className="text-xs text-bad">
+                          <span className="font-semibold">
+                            {PROVIDER_NAMES[issue.provider]} objected{issue.policyRef ? ` (conflict with ${issue.policyRef})` : ""}:
+                          </span>{" "}
+                          {issue.detail}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-2 text-xs text-good">
+                      {r.outcome === "removed"
+                        ? "Resolved by removing the requirement, then re-reviewed and approved."
+                        : `Resolved by rewording${r.suggestedBy ? ` suggested by ${PROVIDER_NAMES[r.suggestedBy]}` : ""}, then re-reviewed and approved.`}
+                    </p>
+                    {r.newStatement ? <p className="mt-1.5 text-sm">{r.newStatement}</p> : null}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ) : null}
+
           <Card>
             <h2 className="font-bold">Who agreed</h2>
             <p className="mt-1 text-sm text-ink/70">
@@ -125,7 +165,7 @@ export default async function LockPage({
         <aside className="space-y-6 lg:sticky lg:top-20 lg:self-start">
           <Verify block={block} serverResult={verification} authorityEphemeral={view.authorityEphemeral} />
           {!isPolicy && !supersededBy ? (
-            <Card>
+            <Card tour="propose">
               <h2 className="font-bold">Need to change it?</h2>
               <p className="mt-1 text-sm text-ink/70">
                 Locked records are never edited. A change becomes a new version that goes back through review.
@@ -144,6 +184,7 @@ export default async function LockPage({
           )}
         </aside>
       </div>
+      {!isPolicy ? <Tour page="lock" isNew={Boolean(isNew)} /> : null}
     </Shell>
   );
 }

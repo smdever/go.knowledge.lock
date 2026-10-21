@@ -8,7 +8,7 @@ export interface ModelCall {
   user: string;
   maxTokens?: number;
   /** Which task the call is for; only used by the local test stub. */
-  task: "review" | "ask" | "drift";
+  task: "review" | "ask" | "drift" | "fix";
   /** Shape of the expected JSON. Anthropic enforces it through structured outputs. */
   schema: OutputSchema;
 }

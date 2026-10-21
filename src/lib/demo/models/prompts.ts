@@ -63,3 +63,29 @@ ${list(policy)}
 WORK ITEM TO CHECK:
 ${work}`;
 }
+
+export const FIX_SYSTEM = `You reviewed a bank's draft requirements and objected to one of them. Now propose a fix.
+Rewrite ONLY that requirement so it fully complies with the locked policy, keeping as much of its original intent
+as the policy allows. Keep it to one or two plain-English sentences in the same style as the other requirements.
+Do not mention policy ids in the requirement itself.
+
+Respond with a single JSON object and nothing else:
+{"statement":"the reworded requirement","explanation":"one sentence on what changed and why it now complies"}`;
+
+export function fixUser(
+  policy: KnowledgeClaim[],
+  requirements: KnowledgeClaim[],
+  target: KnowledgeClaim,
+  issues: { type: string; detail: string; policyRef?: string }[]
+): string {
+  return `LOCKED POLICY:
+${list(policy)}
+
+ALL DRAFT REQUIREMENTS (for context):
+${list(requirements)}
+
+REQUIREMENT TO FIX: ${target.id}: ${target.statement}
+
+YOUR OBJECTIONS TO IT:
+${issues.map((i) => `- ${i.type}${i.policyRef ? ` with ${i.policyRef}` : ""}: ${i.detail}`).join("\n")}`;
+}

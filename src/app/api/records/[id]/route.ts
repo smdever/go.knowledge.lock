@@ -9,6 +9,6 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ id: strin
   return handle(async () => {
     const { id } = await ctx.params;
     const body = await readJson(request);
-    return viewRecord(await updateRecord(id, { title: body.title, requirements: body.requirements }));
+    return viewRecord(await updateRecord(id, { title: body.title, requirements: body.requirements, fix: body.fix }));
   });
 }

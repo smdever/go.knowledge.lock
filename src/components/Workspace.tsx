@@ -11,15 +11,18 @@ import {
   Loader2,
   Lock,
   Plus,
+  PencilLine,
   Send,
   ShieldCheck,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
 import type { KnowledgeClaim } from "@/lib/protocol";
 import { api } from "@/lib/demo/client";
 import { RISKY_REQUIREMENT } from "@/lib/demo/scenario";
-import type { ModelReview, RecordView, ReviewIssue, Stakeholder } from "@/lib/demo/types";
+import type { FixSuggestion, ModelReview, ProviderId, RecordView, ReviewIssue, Stakeholder } from "@/lib/demo/types";
+import Tour, { type TourStep } from "./Tour";
 import { Card, Pill, shortHash } from "./Shell";
 
 const PROVIDER_LABEL = { anthropic: "Anthropic", openai: "OpenAI", google: "Google" } as const;
@@ -43,6 +46,8 @@ export default function Workspace({
   const [reviewing, setReviewing] = useState(false);
   const [locking, setLocking] = useState(false);
   const [error, setError] = useState("");
+  const [suggesting, setSuggesting] = useState<string | null>(null);
+  const [suggestion, setSuggestion] = useState<FixSuggestion | null>(null);
 
   const { record, evaluation, stakeholders, providers } = view;
 
@@ -56,11 +61,11 @@ export default function Workspace({
   const step = evaluation.passed ? 2 : reviewed || reviewing ? 1 : 0;
 
   const issuesByReq = useMemo(() => {
-    const map = new Map<string, { issue: ReviewIssue; provider: string }[]>();
+    const map = new Map<string, { issue: ReviewIssue; provider: string; providerId: ProviderId }[]>();
     for (const r of record.modelReviews) {
       for (const issue of r.issues) {
         const list = map.get(issue.requirementId) ?? [];
-        list.push({ issue, provider: PROVIDER_LABEL[r.provider] });
+        list.push({ issue, provider: PROVIDER_LABEL[r.provider], providerId: r.provider });
         map.set(issue.requirementId, list);
       }
     }
@@ -80,8 +85,11 @@ export default function Workspace({
     }
   }
 
-  async function save(): Promise<RecordView | undefined> {
-    const next = await run(() => api.updateRecord(record.id, title, items), setSaving);
+  async function save(
+    nextItems: string[] = items,
+    fix?: { requirementId: string; provider: ProviderId }
+  ): Promise<RecordView | undefined> {
+    const next = await run(() => api.updateRecord(record.id, title, nextItems, fix), setSaving);
     if (next) {
       setView(next);
       setTitle(next.record.payload.title);
@@ -90,9 +98,10 @@ export default function Workspace({
     return next;
   }
 
-  async function sendForReview() {
-    if (dirty) {
-      const saved = await save();
+  async function sendForReview(nextItems?: string[], fix?: { requirementId: string; provider: ProviderId }) {
+    setSuggestion(null);
+    if (nextItems || dirty) {
+      const saved = await save(nextItems ?? items, fix);
       if (!saved) return;
     }
     const next = await run(() => api.review(record.id), setReviewing);
@@ -106,6 +115,49 @@ export default function Workspace({
   }
 
   const hasRisky = items.some((s) => s === RISKY_REQUIREMENT);
+
+  async function askForFix(requirementId: string, provider: ProviderId) {
+    setSuggestion(null);
+    const result = await run(() => api.suggestFix(record.id, requirementId, provider), (b) =>
+      setSuggesting(b ? requirementId : null)
+    );
+    if (result) setSuggestion(result);
+  }
+
+  function acceptFix(index: number) {
+    if (!suggestion) return;
+    const next = items.map((s, j) => (j === index ? suggestion.statement : s));
+    void sendForReview(next, { requirementId: suggestion.requirementId, provider: suggestion.provider });
+  }
+
+  function removeAndReview(index: number) {
+    void sendForReview(items.filter((_, j) => j !== index));
+  }
+
+  function editYourself(index: number) {
+    setSuggestion(null);
+    const el = document.getElementById(`req-${index}`) as HTMLTextAreaElement | null;
+    el?.focus();
+    el?.select();
+  }
+
+  // ---- Guided tour: the step follows what the visitor has done so far.
+  const blockerReqs = !dirty
+    ? record.payload.claims.filter((c) => (issuesByReq.get(c.id) ?? []).some((f) => f.issue.severity === "blocker"))
+    : [];
+  const okReviews = record.modelReviews.filter((r) => r.status === "ok");
+  const signed = new Set(
+    record.attestations.filter((a) => a.attestorType === "human" && a.decision === "APPROVE").map((a) => a.role)
+  );
+  const resolvedCount = record.resolutions?.length ?? 0;
+  let tourStep: TourStep;
+  if (reviewing) tourStep = resolvedCount ? "rereviewing" : "reviewing";
+  else if (suggestion) tourStep = "suggestion";
+  else if (suggesting) tourStep = "suggesting";
+  else if (blockerReqs.length) tourStep = "objection";
+  else if (!okReviews.length || dirty) tourStep = hasRisky || dirty || record.version > 1 ? "send" : "welcome";
+  else if (evaluation.passed) tourStep = "lock";
+  else tourStep = signed.size > 0 ? "signing" : resolvedCount ? "approved-after-fix" : "approved";
 
   return (
     <div>
@@ -158,11 +210,19 @@ export default function Workspace({
                   const id = `R${i + 1}`;
                   const found = !dirty ? issuesByReq.get(id) ?? [] : [];
                   const blocker = found.some((f) => f.issue.severity === "blocker");
+                  const objector = (found.find((f) => f.issue.severity === "blocker") ?? found[0])?.providerId;
+                  const isFirstBlocker = blocker && blockerReqs[0]?.id === id;
+                  const showSuggestion = suggestion?.requirementId === id;
                   return (
-                    <li key={i} className={`rounded-xl border p-3 ${blocker ? "border-bad/50 bg-bad/5" : found.length ? "border-warn/50 bg-warn/5" : "border-ink/10"}`}>
+                    <li
+                      key={i}
+                      data-tour={isFirstBlocker ? "objection" : undefined}
+                      className={`rounded-xl border p-3 ${blocker ? "border-bad/50 bg-bad/5" : found.length ? "border-warn/50 bg-warn/5" : "border-ink/10"}`}
+                    >
                       <div className="flex items-start gap-3">
                         <span className="mt-2 w-7 shrink-0 font-mono text-xs font-semibold text-accent">{id}</span>
                         <textarea
+                          id={`req-${i}`}
                           aria-label={`Requirement ${id}`}
                           value={statement}
                           onChange={(e) => setItems(items.map((s, j) => (j === i ? e.target.value : s)))}
@@ -192,6 +252,62 @@ export default function Workspace({
                           ))}
                         </ul>
                       ) : null}
+                      {blocker && objector && !showSuggestion ? (
+                        <div className="ml-10 mt-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            data-tour={isFirstBlocker ? "suggest-fix" : undefined}
+                            onClick={() => askForFix(id, objector)}
+                            disabled={Boolean(suggesting) || reviewing || saving}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:brightness-110 disabled:opacity-60"
+                          >
+                            {suggesting === id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                            {suggesting === id ? `Asking ${PROVIDER_LABEL[objector]}…` : `Suggest a fix (${PROVIDER_LABEL[objector]})`}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => editYourself(i)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-ink/15 px-3 py-1.5 text-xs font-semibold hover:border-ink/30"
+                          >
+                            <PencilLine className="h-3.5 w-3.5" /> Edit it myself
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeAndReview(i)}
+                            disabled={reviewing || saving}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-ink/15 px-3 py-1.5 text-xs font-semibold hover:border-bad/50 hover:text-bad disabled:opacity-60"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" /> Remove it
+                          </button>
+                        </div>
+                      ) : null}
+                      {showSuggestion && suggestion ? (
+                        <div data-tour="suggestion" className="ml-10 mt-3 rounded-xl border border-accent/40 bg-accent/5 p-3">
+                          <p className="flex items-center gap-1.5 text-xs font-semibold text-accent">
+                            <Sparkles className="h-3.5 w-3.5" /> {PROVIDER_LABEL[suggestion.provider]} suggests
+                            {suggestion.stub ? <span className="font-mono text-[10px] uppercase text-warn">(test stub)</span> : null}
+                          </p>
+                          <p className="mt-2 text-xs text-muted line-through decoration-bad/60">{statement}</p>
+                          <p className="mt-1.5 text-sm leading-relaxed">{suggestion.statement}</p>
+                          {suggestion.explanation ? <p className="mt-2 text-xs italic text-ink/70">{suggestion.explanation}</p> : null}
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => acceptFix(i)}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:brightness-110"
+                            >
+                              <Check className="h-3.5 w-3.5" /> Accept and review again
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSuggestion(null)}
+                              className="rounded-lg px-2 py-1.5 text-xs text-muted hover:text-ink"
+                            >
+                              Dismiss
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
                     </li>
                   );
                 })}
@@ -208,6 +324,7 @@ export default function Workspace({
                 {!hasRisky ? (
                   <button
                     type="button"
+                    data-tour="add-risky"
                     onClick={() => setItems([...items, RISKY_REQUIREMENT])}
                     disabled={items.length >= 12}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-warn/60 px-3 py-1.5 text-sm font-semibold text-warn hover:bg-warn/5 disabled:opacity-50"
@@ -219,7 +336,8 @@ export default function Workspace({
               <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-ink/10 pt-5">
                 <button
                   type="button"
-                  onClick={sendForReview}
+                  data-tour="send"
+                  onClick={() => sendForReview()}
                   disabled={reviewing || saving}
                   className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
                 >
@@ -229,7 +347,7 @@ export default function Workspace({
                 {dirty ? (
                   <button
                     type="button"
-                    onClick={save}
+                    onClick={() => save()}
                     disabled={saving}
                     className="rounded-lg border border-ink/15 px-4 py-2 text-sm font-semibold hover:border-ink/30 disabled:opacity-60"
                   >
@@ -245,7 +363,7 @@ export default function Workspace({
           <section id="review">
             <SectionTitle n={2} title="Review" text="Independent models check the draft against the locked policy, and each stakeholder signs off." />
             <h3 className="mb-3 text-sm font-semibold text-ink/70">AI reviewers</h3>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div data-tour="models" className="grid grid-cols-1 gap-4 md:grid-cols-3">
               {providers.map((p) => (
                 <ModelCard
                   key={p.id}
@@ -259,7 +377,7 @@ export default function Workspace({
             </div>
             <h3 className="mb-3 mt-8 text-sm font-semibold text-ink/70">Stakeholders</h3>
             <p className="mb-3 text-xs text-muted">In a pilot each person signs in to sign off. In this demo you can act for all three.</p>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div data-tour="stakeholders" className="grid grid-cols-1 gap-4 md:grid-cols-3">
               {stakeholders.map((s) => (
                 <StakeholderCard
                   key={s.role}
@@ -281,9 +399,17 @@ export default function Workspace({
             <SectionTitle n={3} title="Lock" text={`Rules for this record: two or more models from different providers approve with no objections, and Product, Compliance and Engineering all sign off.`} />
             <Card>
               <Checklist view={view} />
+              {resolvedCount ? (
+                <p className="mt-4 flex items-start gap-2 rounded-lg bg-good/10 p-2.5 text-xs text-good">
+                  <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  {resolvedCount} model objection{resolvedCount === 1 ? "" : "s"} resolved. How it was resolved is recorded in
+                  the lock.
+                </p>
+              ) : null}
               <div className="mt-6 border-t border-ink/10 pt-5">
                 <button
                   type="button"
+                  data-tour="lock-button"
                   onClick={lock}
                   disabled={!evaluation.passed || dirty || locking}
                   className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
@@ -320,6 +446,7 @@ export default function Workspace({
           </Card>
         </aside>
       </div>
+      <Tour page="workspace" step={tourStep} />
     </div>
   );
 }
