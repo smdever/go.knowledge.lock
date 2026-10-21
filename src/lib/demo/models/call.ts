@@ -9,7 +9,7 @@ export interface ModelCall {
   maxTokens?: number;
   /** Which task the call is for; only used by the local test stub. */
   task: "review" | "ask" | "drift";
-  /** Shape of the expected JSON. Anthropic enforces it through tool use. */
+  /** Shape of the expected JSON. Anthropic enforces it through structured outputs. */
   schema: OutputSchema;
 }
 
@@ -52,22 +52,27 @@ export async function callModel(provider: ProviderConfig, call: ModelCall): Prom
   const maxTokens = call.maxTokens ?? 2000;
 
   if (provider.id === "anthropic") {
-    // Forced tool use: the API returns the arguments as already-parsed, schema-shaped JSON.
-    const data = (await post(
-      "https://api.anthropic.com/v1/messages",
-      { "x-api-key": provider.apiKey, "anthropic-version": "2023-06-01" },
-      {
-        model: provider.model,
-        max_tokens: maxTokens,
-        system: call.system,
-        messages: [{ role: "user", content: call.user }],
-        tools: [{ name: call.schema.name, description: call.schema.description, input_schema: call.schema.schema }],
-        tool_choice: { type: "tool", name: call.schema.name },
-      }
-    )) as { content?: { type: string; text?: string; input?: unknown }[]; stop_reason?: string };
+    // Structured outputs: the API constrains the reply to the JSON Schema.
+    const request = {
+      model: provider.model,
+      max_tokens: maxTokens,
+      system: call.system,
+      messages: [{ role: "user", content: call.user }],
+    };
+    const headers = { "x-api-key": provider.apiKey, "anthropic-version": "2023-06-01" };
+    let data: { content?: { type: string; text?: string }[]; stop_reason?: string };
+    try {
+      data = (await post("https://api.anthropic.com/v1/messages", headers, {
+        ...request,
+        output_config: { format: { type: "json_schema", schema: call.schema.schema } },
+      })) as typeof data;
+    } catch (err) {
+      // Models without structured-output support: fall back to plain JSON-in-text (parsed and retried below).
+      if (!/^400 .*(output_config|json_schema|format)/i.test((err as Error).message)) throw err;
+      data = (await post("https://api.anthropic.com/v1/messages", headers, request)) as typeof data;
+    }
     if (data.stop_reason === "max_tokens") throw new MalformedOutputError("The model's answer was cut off.");
-    const tool = (data.content ?? []).find((c) => c.type === "tool_use");
-    if (tool?.input && typeof tool.input === "object") return JSON.stringify(tool.input);
+    if (data.stop_reason === "refusal") throw new Error("The model declined to answer.");
     return (data.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("");
   }
 

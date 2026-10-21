@@ -1,4 +1,7 @@
-/** JSON Schemas for structured model output (used for Anthropic tool use). */
+/**
+ * JSON Schemas for structured model output. Anthropic enforces them through structured outputs
+ * (output_config.format), which requires additionalProperties: false on every object.
+ */
 
 export interface OutputSchema {
   name: string;
@@ -26,10 +29,12 @@ export const REVIEW_SCHEMA: OutputSchema = {
             policyRef: { type: "string", description: 'e.g. "P1"' },
           },
           required: ["requirementId", "type", "severity", "detail"],
+          additionalProperties: false,
         },
       },
     },
     required: ["decision", "summary", "issues"],
+    additionalProperties: false,
   },
 };
 
@@ -44,6 +49,7 @@ export const ASK_SCHEMA: OutputSchema = {
       covered: { type: "boolean" },
     },
     required: ["answer", "citations", "covered"],
+    additionalProperties: false,
   },
 };
 
@@ -65,9 +71,11 @@ export const DRIFT_SCHEMA: OutputSchema = {
             detail: { type: "string" },
           },
           required: ["requirementId", "kind", "excerpt", "detail"],
+          additionalProperties: false,
         },
       },
     },
     required: ["summary", "findings"],
+    additionalProperties: false,
   },
 };
