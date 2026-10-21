@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AlertTriangle, Check, Download, Loader2, MessageSquare, SearchCheck, ShieldAlert, ShieldCheck } from "lucide-react";
+import { motion } from "motion/react";
 import { computeCanonicalPayloadHash, verifyKnowledgeLock, type KnowledgeLockBlock, type VerificationResult } from "@/lib/protocol";
 import { api } from "@/lib/demo/client";
 import { Card, Pill, shortHash } from "./Shell";
@@ -106,7 +107,13 @@ export function Verify({
           <AlertTriangle className="h-3.5 w-3.5" /> Try a quiet edit
         </button>
         {tamper ? (
-          <div className="mt-4 space-y-3 rounded-xl border border-bad/40 bg-bad/5 p-3 text-xs">
+          <motion.div
+            key={tamper.result.computedHash}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            className="mt-4 space-y-3 rounded-xl border border-bad/40 bg-bad/5 p-3 text-xs"
+          >
             <p className="leading-relaxed">
               <span className="font-mono font-semibold">{tamper.id}</span> changed to: <span className="italic">&ldquo;{tamper.after}&rdquo;</span>
             </p>
@@ -120,7 +127,7 @@ export function Verify({
               Now {shortHash(tamper.result.computedHash)}
             </p>
             <p className="text-ink/80">The edit is caught, and every sign-off stops counting because it was given for the original wording.</p>
-          </div>
+          </motion.div>
         ) : null}
       </div>
     </Card>
@@ -205,7 +212,12 @@ export function Build({ lockId, questions, sampleTicket }: { lockId: string; que
             </button>
           </div>
           {answer ? (
-            <div className="mt-4 rounded-xl border border-ink/10 p-4">
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+              className="mt-4 rounded-xl border border-ink/10 p-4"
+            >
               {answer.stub ? <p className="mb-2 font-mono text-[10px] uppercase tracking-wider text-warn">Local test stub, not a real model</p> : null}
               {!answer.covered ? <Pill tone="warn">Not covered by the locked record</Pill> : null}
               <p className="mt-2 text-sm leading-relaxed">{answer.answer}</p>
@@ -216,7 +228,7 @@ export function Build({ lockId, questions, sampleTicket }: { lockId: string; que
                 ))}
                 <span className="ml-auto font-mono">{answer.model}</span>
               </div>
-            </div>
+            </motion.div>
           ) : null}
         </div>
       ) : (
@@ -234,7 +246,12 @@ export function Build({ lockId, questions, sampleTicket }: { lockId: string; que
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <SearchCheck className="h-4 w-4" />} Check for drift
           </button>
           {drift ? (
-            <div className="mt-4 space-y-3">
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+              className="mt-4 space-y-3"
+            >
               {drift.stub ? <p className="font-mono text-[10px] uppercase tracking-wider text-warn">Local test stub, not a real model</p> : null}
               <p className="text-sm">{drift.summary}</p>
               {drift.findings.length === 0 ? <Pill tone="good"><Check className="h-3 w-3" /> Matches what was agreed</Pill> : null}
@@ -251,7 +268,7 @@ export function Build({ lockId, questions, sampleTicket }: { lockId: string; que
                 ))}
               </ul>
               <p className="text-right font-mono text-xs text-muted">{drift.model}</p>
-            </div>
+            </motion.div>
           ) : null}
         </div>
       )}

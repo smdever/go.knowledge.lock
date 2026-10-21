@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Bot, Check, Lock, User, X } from "lucide-react";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import type { KnowledgeLockBlock, VerificationResult } from "@/lib/protocol";
 import type { ProviderId, Resolution } from "@/lib/demo/types";
 import { Build, Verify } from "./LockTools";
@@ -55,10 +56,10 @@ export default function LockScreens({
 
   function go(next: Tab) {
     setTab(next);
-    window.scrollTo({ top: 0 });
   }
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="mx-auto max-w-[680px]">
       {supersededBy ? (
         <p className="mb-6 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2.5 text-sm text-warn">
@@ -88,7 +89,15 @@ export default function LockScreens({
               onClick={() => go(t.id)}
               className="text-left"
             >
-              <span className={`block h-1 rounded-full ${active ? "bg-accent" : "bg-ink/10"}`} />
+              <span className="relative block h-1 rounded-full bg-ink/10">
+                {active ? (
+                  <motion.span
+                    layoutId="tab-active"
+                    className="absolute inset-0 rounded-full bg-accent"
+                    transition={{ type: "spring", stiffness: 380, damping: 34 }}
+                  />
+                ) : null}
+              </span>
               <span className={`mt-2 block text-xs sm:text-sm ${active ? "font-semibold" : "text-ink/70 hover:text-ink"}`}>
                 {t.label}
               </span>
@@ -97,8 +106,9 @@ export default function LockScreens({
         })}
       </div>
 
+      <AnimatePresence mode="wait" initial={false} onExitComplete={() => window.scrollTo({ top: 0 })}>
       {tab === "record" ? (
-        <section className="mt-8">
+        <Panel key="record">
           <Heading
             title={isNew ? "Locked. This is now the signed-off version" : block.payload.title}
             text={
@@ -174,11 +184,11 @@ export default function LockScreens({
             )}
             <Primary onClick={() => go("verify")}>Next: verify it</Primary>
           </Footer>
-        </section>
+        </Panel>
       ) : null}
 
       {tab === "verify" ? (
-        <section className="mt-8">
+        <Panel key="verify">
           <Heading
             title="Anyone can check it hasn't changed"
             text="Run the check in your browser, then try changing a single word in a copy and see what happens."
@@ -190,11 +200,11 @@ export default function LockScreens({
             <Secondary onClick={() => go("record")}>Back</Secondary>
             {isPolicy ? <StartButton label="Start the demo" /> : <Primary onClick={() => go("build")}>Next: build from it</Primary>}
           </Footer>
-        </section>
+        </Panel>
       ) : null}
 
       {tab === "build" ? (
-        <section className="mt-8">
+        <Panel key="build">
           <Heading
             title="Teams and AI agents work from this version only"
             text="Ask the agent a question, or check a backlog ticket against what was agreed."
@@ -227,9 +237,25 @@ export default function LockScreens({
             <Secondary onClick={() => go("verify")}>Back</Secondary>
             <span />
           </Footer>
-        </section>
+        </Panel>
       ) : null}
+      </AnimatePresence>
     </div>
+    </MotionConfig>
+  );
+}
+
+function Panel({ children }: { children: React.ReactNode }) {
+  return (
+    <motion.section
+      className="mt-8"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -6 }}
+      transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+    >
+      {children}
+    </motion.section>
   );
 }
 

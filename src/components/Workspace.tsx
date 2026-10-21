@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Check, ChevronDown, Loader2, Lock, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import type { KnowledgeClaim } from "@/lib/protocol";
 import { api } from "@/lib/demo/client";
 import type { FixSuggestion, ProviderId, RecordView, ReviewIssue, Stakeholder } from "@/lib/demo/types";
@@ -25,6 +26,8 @@ interface Objection {
   policyRefs: string[];
   reasons: { provider: ProviderId; issue: ReviewIssue }[];
 }
+
+const EASE = [0.22, 1, 0.36, 1] as const;
 
 const listNames = (names: string[]) =>
   names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
@@ -102,15 +105,22 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
 
   useEffect(() => {
     if (screen !== "propose" || focusIndex === null) return;
-    const el = document.getElementById(`req-${focusIndex}`) as HTMLTextAreaElement | null;
-    el?.focus();
-    el?.setSelectionRange(el.value.length, el.value.length);
+    // The draft screen mounts after the previous screen has animated out, so wait for the field.
+    let tries = 0;
+    const timer = window.setInterval(() => {
+      const el = document.getElementById(`req-${focusIndex}`) as HTMLTextAreaElement | null;
+      if (el || ++tries > 30) {
+        window.clearInterval(timer);
+        el?.focus();
+        el?.setSelectionRange(el.value.length, el.value.length);
+      }
+    }, 40);
+    return () => window.clearInterval(timer);
   }, [screen, focusIndex]);
 
   function go(next: Screen) {
     setScreen(next);
     setError("");
-    window.scrollTo({ top: 0 });
   }
 
   async function attempt<T>(fn: () => Promise<T>, state: typeof busy): Promise<T | undefined> {
@@ -182,6 +192,7 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
   const reviewing = busy === "reviewing" || busy === "saving";
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="mx-auto max-w-[680px]">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <p className="text-sm font-semibold">{record.payload.title}</p>
@@ -211,9 +222,10 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
         </div>
       ) : null}
 
+      <AnimatePresence mode="wait" initial={false} onExitComplete={() => window.scrollTo({ top: 0 })}>
       {/* ---------------- Propose ---------------- */}
       {screen === "propose" ? (
-        <section className="mt-8">
+        <Screen key="propose">
           <Heading
             title={record.version > 1 ? "Make your change" : "One of these requirements breaks the bank's policy"}
             text={
@@ -265,12 +277,12 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
               <PrimaryButton onClick={() => sendForReview()}>Send for review</PrimaryButton>
             )}
           </Footer>
-        </section>
+        </Screen>
       ) : null}
 
       {/* ---------------- AI review ---------------- */}
       {screen === "review" ? (
-        <section className="mt-8">
+        <Screen key="review">
           {reviewing ? (
             <Heading
               title={resolvedCount ? "The reviewers are checking the new wording" : "Three AI reviewers are reading the draft"}
@@ -301,6 +313,7 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
             />
           )}
 
+          <AnimatePresence initial={false}>
           {!reviewing
             ? objections.map((o) => (
                 <ObjectionCard
@@ -326,6 +339,7 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
                 />
               ))
             : null}
+          </AnimatePresence>
 
           <ul className="mt-8 divide-y divide-ink/10 border-y border-ink/10">
             {providers.map((p) => {
@@ -385,12 +399,12 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
               <span />
             )}
           </Footer>
-        </section>
+        </Screen>
       ) : null}
 
       {/* ---------------- Sign off ---------------- */}
       {screen === "signoff" ? (
-        <section className="mt-8">
+        <Screen key="signoff">
           <Heading
             title={allSigned ? "Everyone has signed off" : "Now the people sign off"}
             text="Each person approves this exact wording. In a pilot they'd each sign in from their own account; here you can act for all three."
@@ -422,12 +436,12 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
               Next: lock it
             </PrimaryButton>
           </Footer>
-        </section>
+        </Screen>
       ) : null}
 
       {/* ---------------- Lock ---------------- */}
       {screen === "lock" ? (
-        <section className="mt-8">
+        <Screen key="lock">
           <Heading
             title={evaluation.passed ? "Ready to lock" : "Not ready to lock yet"}
             text="Locking fingerprints this exact wording, signs it and stores it. From then on, nobody can quietly change it."
@@ -452,9 +466,11 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
               Lock this version
             </PrimaryButton>
           </Footer>
-        </section>
+        </Screen>
       ) : null}
+      </AnimatePresence>
     </div>
+    </MotionConfig>
   );
 }
 
@@ -485,7 +501,15 @@ function StepBar({
                 aria-current={active ? "step" : undefined}
                 className="w-full text-left disabled:cursor-default"
               >
-                <span className={`block h-1 rounded-full ${active ? "bg-accent" : done ? "bg-steel/60" : "bg-ink/10"}`} />
+                <span className={`relative block h-1 rounded-full ${done ? "bg-steel/60" : "bg-ink/10"}`}>
+                  {active ? (
+                    <motion.span
+                      layoutId="step-active"
+                      className="absolute inset-0 rounded-full bg-accent"
+                      transition={{ type: "spring", stiffness: 380, damping: 34 }}
+                    />
+                  ) : null}
+                </span>
                 <span
                   className={`mt-2 block text-xs sm:text-sm ${
                     active ? "font-semibold text-ink" : reachable[s.id] ? "text-ink/70 hover:text-ink" : "text-muted"
@@ -502,12 +526,35 @@ function StepBar({
   );
 }
 
+function Screen({ children }: { children: React.ReactNode }) {
+  return (
+    <motion.section
+      className="mt-8"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -6 }}
+      transition={{ duration: 0.24, ease: EASE }}
+    >
+      {children}
+    </motion.section>
+  );
+}
+
+/** The heading cross-fades when its message changes (for example from "reviewing" to "blocked"). */
 function Heading({ title, text }: { title: string; text: string }) {
   return (
-    <div>
-      <h1 className="text-2xl font-semibold leading-tight tracking-tight sm:text-[28px]">{title}</h1>
-      <p className="mt-2 max-w-[60ch] text-[15px] leading-relaxed text-ink/70">{text}</p>
-    </div>
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={title}
+        initial={{ opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -4 }}
+        transition={{ duration: 0.18, ease: EASE }}
+      >
+        <h1 className="text-2xl font-semibold leading-tight tracking-tight sm:text-[28px]">{title}</h1>
+        <p className="mt-2 max-w-[60ch] text-[15px] leading-relaxed text-ink/70">{text}</p>
+      </motion.div>
+    </AnimatePresence>
   );
 }
 
@@ -623,7 +670,18 @@ function ReviewerRow({
           <span className="font-semibold">{name}</span> <span className="text-muted">{model}</span>
           {stub ? <span className="ml-2 text-xs text-warn">test stub</span> : null}
         </span>
-        {status}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span
+            key={state}
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="shrink-0"
+          >
+            {status}
+          </motion.span>
+        </AnimatePresence>
       </div>
       {summary && state !== "running" ? <p className="mt-1 text-sm leading-relaxed text-ink/65">{summary}</p> : null}
     </li>
@@ -656,23 +714,47 @@ function ObjectionCard({
   const [showDetails, setShowDetails] = useState(false);
   const suggestionRef = useRef<HTMLDivElement>(null);
   const rules = policy.filter((p) => objection.policyRefs.includes(p.id));
+  const objector = PROVIDER_LABEL[objection.raisedBy[0]];
+  const hasSuggestion = Boolean(suggestion);
 
   useEffect(() => {
     if (!suggestion) return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    suggestionRef.current?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
+    // Wait for the panel to open before bringing it into view.
+    const t = window.setTimeout(
+      () => suggestionRef.current?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" }),
+      reduce ? 0 : 260
+    );
+    return () => window.clearTimeout(t);
   }, [suggestion]);
-  const objector = PROVIDER_LABEL[objection.raisedBy[0]];
 
   return (
-    <article className="mt-6 overflow-hidden rounded-xl border-2 border-bad/50 bg-white/40">
-      <div className="p-5">
+    <motion.article
+      layout
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, height: 0, marginTop: 0 }}
+      transition={{ duration: 0.28, ease: EASE }}
+      className="mt-6 overflow-hidden rounded-xl border-2 border-bad/50 bg-white/40"
+    >
+      {/* The objection. Once a fix is on the table it steps back so the fix reads first. */}
+      <motion.div
+        animate={{ opacity: hasSuggestion ? 0.55 : 1 }}
+        transition={{ duration: 0.25 }}
+        className="p-5"
+      >
         <p className="text-sm font-semibold text-bad">
           {objection.claim.id}, objected to by {listNames(objection.raisedBy.map((p) => PROVIDER_LABEL[p]))}
         </p>
-        <blockquote className="mt-2 text-[15px] leading-relaxed">&ldquo;{objection.claim.statement}&rdquo;</blockquote>
+        <blockquote
+          className={`mt-2 text-[15px] leading-relaxed transition-colors duration-300 ${
+            hasSuggestion ? "text-ink/70 line-through decoration-bad/60" : ""
+          }`}
+        >
+          &ldquo;{objection.claim.statement}&rdquo;
+        </blockquote>
 
-        {rules.length ? (
+        {rules.length && !hasSuggestion ? (
           <div className="mt-4 rounded-lg bg-bad/[0.07] p-3 text-sm leading-relaxed">
             {rules.map((r) => (
               <p key={r.id}>
@@ -682,69 +764,104 @@ function ObjectionCard({
           </div>
         ) : null}
 
-        <p className="mt-3 text-sm leading-relaxed text-ink/75">{objection.reasons[0].issue.detail}</p>
-        {objection.reasons.length > 1 ? (
-          <button
-            type="button"
-            onClick={() => setShowDetails(!showDetails)}
-            aria-expanded={showDetails}
-            className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-steel hover:text-ink"
-          >
-            <ChevronDown className={`h-4 w-4 transition-transform ${showDetails ? "rotate-180" : ""}`} />
-            What each reviewer said
-          </button>
+        {!hasSuggestion ? (
+          <>
+            <p className="mt-3 text-sm leading-relaxed text-ink/75">{objection.reasons[0].issue.detail}</p>
+            {objection.reasons.length > 1 ? (
+              <button
+                type="button"
+                onClick={() => setShowDetails(!showDetails)}
+                aria-expanded={showDetails}
+                className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-steel hover:text-ink"
+              >
+                <ChevronDown className={`h-4 w-4 transition-transform ${showDetails ? "rotate-180" : ""}`} />
+                What each reviewer said
+              </button>
+            ) : null}
+            <AnimatePresence initial={false}>
+              {showDetails ? (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.22, ease: EASE }}
+                  className="overflow-hidden"
+                >
+                  <ul className="mt-2 space-y-2 border-l-2 border-ink/10 pl-3 text-sm text-ink/70">
+                    {objection.reasons.map((r, i) => (
+                      <li key={i}>
+                        <span className="font-semibold">{PROVIDER_LABEL[r.provider]}:</span> {r.issue.detail}
+                      </li>
+                    ))}
+                  </ul>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+          </>
         ) : null}
-        {showDetails ? (
-          <ul className="mt-2 space-y-2 border-l-2 border-ink/10 pl-3 text-sm text-ink/70">
-            {objection.reasons.map((r, i) => (
-              <li key={i}>
-                <span className="font-semibold">{PROVIDER_LABEL[r.provider]}:</span> {r.issue.detail}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </div>
+      </motion.div>
 
-      {suggestion ? (
-        <div ref={suggestionRef} className="scroll-mb-24 border-t border-ink/10 bg-accent/[0.06] p-5">
-          <p className="flex items-center gap-1.5 text-sm font-semibold">
-            <Sparkles className="h-4 w-4 text-accent" /> {PROVIDER_LABEL[suggestion.provider]} suggests this wording
-            {suggestion.stub ? <span className="text-xs font-normal text-warn">(test stub)</span> : null}
-          </p>
-          <p className="mt-2 text-[15px] leading-relaxed">{suggestion.statement}</p>
-          {suggestion.explanation ? <p className="mt-2 text-sm text-ink/65">{suggestion.explanation}</p> : null}
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <PrimaryButton onClick={onAccept}>
-              <Check className="h-4 w-4" /> Use this and review again
+      <AnimatePresence mode="wait" initial={false}>
+        {suggestion ? (
+          <motion.div
+            key="suggestion"
+            ref={suggestionRef}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.26, ease: EASE }}
+            className="scroll-mb-24 overflow-hidden"
+          >
+            <div className="border-l-4 border-good bg-[color-mix(in_srgb,var(--good)_10%,var(--bg-main))] p-5">
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-good">
+                <Sparkles className="h-4 w-4" /> Suggested wording from {PROVIDER_LABEL[suggestion.provider]}
+                {suggestion.stub ? <span className="text-xs font-normal text-warn">(test stub)</span> : null}
+              </p>
+              <p className="mt-2 text-base leading-relaxed text-ink">{suggestion.statement}</p>
+              {suggestion.explanation ? (
+                <p className="mt-2 text-sm leading-relaxed text-ink/70">{suggestion.explanation}</p>
+              ) : null}
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <PrimaryButton onClick={onAccept}>
+                  <Check className="h-4 w-4" /> Use this and review again
+                </PrimaryButton>
+                <SecondaryButton onClick={onDismiss}>Not this</SecondaryButton>
+              </div>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="actions"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-ink/10 px-5 py-4"
+          >
+            <PrimaryButton onClick={onSuggest} disabled={disabled}>
+              {suggesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              {suggesting ? `Asking ${objector}` : `Ask ${objector} for a fix`}
             </PrimaryButton>
-            <SecondaryButton onClick={onDismiss}>Not this</SecondaryButton>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-ink/10 px-5 py-4">
-          <PrimaryButton onClick={onSuggest} disabled={disabled}>
-            {suggesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            {suggesting ? `Asking ${objector}` : `Ask ${objector} for a fix`}
-          </PrimaryButton>
-          <button
-            type="button"
-            onClick={onEdit}
-            disabled={disabled}
-            className="text-sm font-semibold text-steel hover:text-ink disabled:opacity-50"
-          >
-            Edit it myself
-          </button>
-          <button
-            type="button"
-            onClick={onRemove}
-            disabled={disabled}
-            className="text-sm font-semibold text-steel hover:text-bad disabled:opacity-50"
-          >
-            Remove it
-          </button>
-        </div>
-      )}
-    </article>
+            <button
+              type="button"
+              onClick={onEdit}
+              disabled={disabled}
+              className="text-sm font-semibold text-steel hover:text-ink disabled:opacity-50"
+            >
+              Edit it myself
+            </button>
+            <button
+              type="button"
+              onClick={onRemove}
+              disabled={disabled}
+              className="text-sm font-semibold text-steel hover:text-bad disabled:opacity-50"
+            >
+              Remove it
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.article>
   );
 }
 
@@ -772,9 +889,14 @@ function SignerRow({
           <p className="text-sm text-muted">{stakeholder.title}</p>
         </div>
         {approved ? (
-          <span className="inline-flex items-center gap-1 text-sm font-semibold text-good">
+          <motion.span
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.2, ease: EASE }}
+            className="inline-flex items-center gap-1 text-sm font-semibold text-good"
+          >
             <Check className="h-4 w-4" /> Signed off
-          </span>
+          </motion.span>
         ) : !asking ? (
           <div className="flex items-center gap-3">
             <button
