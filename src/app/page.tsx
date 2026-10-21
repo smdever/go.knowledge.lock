@@ -8,7 +8,7 @@ import { DRAFT_TITLE, ORG_NAME, POLICY_PAYLOAD, STAKEHOLDERS } from "@/lib/demo/
 export const dynamic = "force-dynamic";
 
 const STEPS = [
-  { icon: FilePenLine, title: "Propose", text: "Start from a draft set of requirements. Edit them, or add one that quietly breaks policy." },
+  { icon: FilePenLine, title: "Propose", text: "Start from a draft set of requirements. One of them quietly breaks the bank's policy." },
   { icon: Users, title: "Review", text: "Three AI models from different providers check the draft against locked policy. Three stakeholders sign off." },
   { icon: Lock, title: "Lock", text: "Once the rules are met, the agreed version is hashed, signed and stored. Anyone can verify it." },
   { icon: Hammer, title: "Build from it", text: "An agent answers from the locked record only, a ticket is checked for drift, and changes go back through review." },
@@ -19,7 +19,7 @@ export default async function Home() {
   return (
     <Shell>
       <section className="max-w-3xl">
-        <p className="font-mono text-xs font-semibold uppercase tracking-wider text-accent">Interactive demo · about 3 minutes</p>
+        <p className="text-sm font-semibold text-accent">Interactive demo, about three minutes</p>
         <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-5xl">Signed-off truth for teams and AI</h1>
         <p className="mt-4 text-base leading-relaxed text-ink/75 sm:text-lg">
           {ORG_NAME} is building an AI assistant to help customers raise complaints. Product, Compliance and Engineering
@@ -35,8 +35,9 @@ export default async function Home() {
         {STEPS.map((s, i) => (
           <Card key={s.title}>
             <s.icon className="h-5 w-5 text-accent" />
-            <p className="mt-3 font-mono text-xs font-semibold text-accent">{String(i + 1).padStart(2, "0")}</p>
-            <h2 className="mt-1 font-bold">{s.title}</h2>
+            <h2 className="mt-3 font-bold">
+              {i + 1}. {s.title}
+            </h2>
             <p className="mt-1.5 text-sm leading-relaxed text-ink/70">{s.text}</p>
           </Card>
         ))}

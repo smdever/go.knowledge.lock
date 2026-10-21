@@ -47,7 +47,7 @@ export function stubResponse(provider: ProviderId, call: ModelCall): string {
     if (/job|hardship|bereave|ill/.test(q)) {
       return JSON.stringify({
         answer: "[stub] Offer an immediate handover to a colleague in the same conversation.",
-        citations: ["R4", "P3"],
+        citations: ["R5", "P3"],
         covered: true,
       });
     }

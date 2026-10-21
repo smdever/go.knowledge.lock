@@ -5,7 +5,6 @@ import { AlertTriangle, Check, Download, Loader2, MessageSquare, SearchCheck, Sh
 import { computeCanonicalPayloadHash, verifyKnowledgeLock, type KnowledgeLockBlock, type VerificationResult } from "@/lib/protocol";
 import { api } from "@/lib/demo/client";
 import { Card, Pill, shortHash } from "./Shell";
-import { tourEvent } from "./Tour";
 
 function tamperedCopy(block: KnowledgeLockBlock): { copy: KnowledgeLockBlock; before: string; after: string; id: string } {
   const copy = JSON.parse(JSON.stringify(block)) as KnowledgeLockBlock;
@@ -46,7 +45,6 @@ export function Verify({
     const t = tamperedCopy(block);
     try {
       setTamper({ id: t.id, before: t.before, after: t.after, result: await verifyKnowledgeLock(t.copy) });
-      tourEvent("tampered");
     } catch {
       const computedHash = await computeCanonicalPayloadHash(t.copy.payload);
       setTamper({
@@ -55,7 +53,6 @@ export function Verify({
         after: t.after,
         result: { ...serverResult, valid: false, tamperDetected: true, consensusSatisfied: false, computedHash, errors: [] },
       });
-      tourEvent("tampered");
     }
     setBusy(false);
   }
@@ -71,7 +68,7 @@ export function Verify({
   }
 
   return (
-    <Card tour="verify">
+    <Card>
       <div className="flex items-center justify-between gap-2">
         <h2 className="font-bold">Verification</h2>
         {result.valid ? (
@@ -154,7 +151,6 @@ export function Build({ lockId, questions, sampleTicket }: { lockId: string; que
     setAnswer(null);
     try {
       setAnswer(await api.ask(lockId, question));
-      tourEvent("answered");
     } catch (err) {
       setError((err as Error).message);
     }
@@ -167,7 +163,6 @@ export function Build({ lockId, questions, sampleTicket }: { lockId: string; que
     setDrift(null);
     try {
       setDrift(await api.drift(lockId, ticket));
-      tourEvent("answered");
     } catch (err) {
       setError((err as Error).message);
     }
@@ -178,10 +173,8 @@ export function Build({ lockId, questions, sampleTicket }: { lockId: string; que
     `inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold ${tab === t ? "bg-accent text-white" : "text-ink/70 hover:text-ink"}`;
 
   return (
-    <Card tour="build">
-      <h2 className="font-bold">Build from it</h2>
-      <p className="mt-1 text-sm text-ink/70">Teams and AI agents work from this locked version, and only this version.</p>
-      <div className="mt-4 inline-flex gap-1 rounded-xl border border-ink/10 p-1" role="tablist">
+    <Card>
+      <div className="inline-flex gap-1 rounded-xl border border-ink/10 p-1" role="tablist">
         <button type="button" role="tab" aria-selected={tab === "ask"} className={tabClass("ask")} onClick={() => setTab("ask")}>
           <MessageSquare className="h-4 w-4" /> Ask the agent
         </button>

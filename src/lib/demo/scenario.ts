@@ -83,22 +83,24 @@ export const DRAFT_REQUIREMENTS: { id: string; statement: string }[] = [
   {
     id: "R4",
     statement:
-      "If the customer mentions bereavement, serious illness or financial difficulty, the assistant offers an immediate handover to a colleague in the same conversation.",
+      "To resolve simple complaints faster, the assistant may offer a goodwill payment of up to £25 without involving a case handler.",
   },
   {
     id: "R5",
     statement:
-      "The assistant uses a language model hosted in the bank's UK cloud region, and conversation data is excluded from model training.",
+      "If the customer mentions bereavement, serious illness or financial difficulty, the assistant offers an immediate handover to a colleague in the same conversation.",
   },
   {
     id: "R6",
+    statement:
+      "The assistant uses a language model hosted in the bank's UK cloud region, and conversation data is excluded from model training.",
+  },
+  {
+    id: "R7",
     statement: "Conversation transcripts are attached to the complaint case and retained in line with the complaints policy.",
   },
 ];
 
-/** A requirement that quietly breaks policy P1, for showing a blocked lock. */
-export const RISKY_REQUIREMENT =
-  "To resolve simple complaints faster, the assistant may offer a goodwill payment of up to £25 without involving a case handler.";
 
 export const SAMPLE_QUESTIONS = [
   "Can the assistant offer a customer a refund?",

@@ -1,0 +1,294 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { Bot, Check, Lock, User, X } from "lucide-react";
+import type { KnowledgeLockBlock, VerificationResult } from "@/lib/protocol";
+import type { ProviderId, Resolution } from "@/lib/demo/types";
+import { Build, Verify } from "./LockTools";
+import StartButton from "./StartButton";
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://guidedorchestration.com";
+const PROVIDER_NAMES: Record<ProviderId, string> = { anthropic: "Anthropic", openai: "OpenAI", google: "Google" };
+
+type Tab = "record" | "verify" | "build";
+
+const fmt = (ms: number) =>
+  new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/London" }).format(ms);
+
+export default function LockScreens({
+  block,
+  verification,
+  supersededBy,
+  isPolicy,
+  policyLockId,
+  authorityEphemeral,
+  isNew,
+  questions,
+  sampleTicket,
+}: {
+  block: KnowledgeLockBlock;
+  verification: VerificationResult;
+  supersededBy: string | null;
+  isPolicy: boolean;
+  policyLockId: string;
+  authorityEphemeral: boolean;
+  isNew: boolean;
+  questions: string[];
+  sampleTicket: string;
+}) {
+  const [tab, setTab] = useState<Tab>("record");
+  const version = Number(block.payload.metadata?.version ?? 1);
+  const resolutions = (block.payload.metadata?.resolutions as Resolution[] | undefined) ?? [];
+  const people = block.consensus.attestations.filter((a) => a.attestorType === "human");
+  const models = block.consensus.attestations.filter((a) => a.attestorType === "model");
+  const tabs: { id: Tab; label: string }[] = isPolicy
+    ? [
+        { id: "record", label: "The policy" },
+        { id: "verify", label: "Verify it" },
+      ]
+    : [
+        { id: "record", label: "The record" },
+        { id: "verify", label: "Verify it" },
+        { id: "build", label: "Build from it" },
+      ];
+
+  function go(next: Tab) {
+    setTab(next);
+    window.scrollTo({ top: 0 });
+  }
+
+  return (
+    <div className="mx-auto max-w-[680px]">
+      {supersededBy ? (
+        <p className="mb-6 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2.5 text-sm text-warn">
+          A newer version has replaced this one.{" "}
+          <Link href={`/l/${supersededBy}`} className="font-semibold underline">
+            Open the current version
+          </Link>
+        </p>
+      ) : null}
+
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-good">
+          <Lock className="h-4 w-4" /> {isPolicy ? "Locked policy" : `Locked v${version}`}
+        </p>
+        <p className="text-sm text-muted">Locked {fmt(block.lockedAt)}</p>
+      </div>
+
+      <div role="tablist" aria-label="Locked record" className="mt-5 grid grid-flow-col gap-1.5">
+        {tabs.map((t) => {
+          const active = t.id === tab;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => go(t.id)}
+              className="text-left"
+            >
+              <span className={`block h-1 rounded-full ${active ? "bg-accent" : "bg-ink/10"}`} />
+              <span className={`mt-2 block text-xs sm:text-sm ${active ? "font-semibold" : "text-ink/70 hover:text-ink"}`}>
+                {t.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {tab === "record" ? (
+        <section className="mt-8">
+          <Heading
+            title={isNew ? "Locked. This is now the signed-off version" : block.payload.title}
+            text={
+              isPolicy
+                ? "The bank's complaints policy, seeded for this demo. New requirements are checked against it."
+                : "Teams and AI agents work from exactly this wording. Anyone with the link sees the same version."
+            }
+          />
+          <ol className="mt-6 divide-y divide-ink/10 border-y border-ink/10">
+            {block.payload.claims.map((c) => (
+              <li key={c.id} className="flex gap-3 py-3 text-[15px] leading-relaxed">
+                <span className="w-7 shrink-0 text-sm font-semibold text-steel">{c.id}</span>
+                <span>{c.statement}</span>
+              </li>
+            ))}
+          </ol>
+
+          {resolutions.length ? (
+            <div className="mt-8">
+              <h2 className="text-lg font-semibold">
+                {resolutions.length === 1 ? "One objection was resolved" : `${resolutions.length} objections were resolved`} before
+                locking
+              </h2>
+              <p className="mt-1 text-sm text-ink/65">This history is part of the signed record, so it can&apos;t be rewritten.</p>
+              <ul className="mt-4 space-y-4">
+                {resolutions.map((r, i) => (
+                  <li key={i} className="rounded-xl border border-ink/10 bg-white/35 p-4 text-sm leading-relaxed">
+                    <p className="text-ink/55 line-through decoration-bad/50">{r.originalStatement}</p>
+                    <p className="mt-2 text-bad">
+                      {listNames(r.raisedBy.map((p) => PROVIDER_NAMES[p]))} objected
+                      {r.issues[0]?.policyRef ? `: it broke ${r.issues[0].policyRef}` : ""}.
+                    </p>
+                    <p className="mt-1 text-good">
+                      {r.outcome === "removed"
+                        ? "Removed, then re-reviewed and approved."
+                        : `Reworded${r.suggestedBy ? ` using ${PROVIDER_NAMES[r.suggestedBy]}'s suggestion` : ""}, then re-reviewed and approved:`}
+                    </p>
+                    {r.newStatement ? <p className="mt-1">{r.newStatement}</p> : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          <div className="mt-8">
+            <h2 className="text-lg font-semibold">Who agreed</h2>
+            <ul className="mt-3 divide-y divide-ink/10 border-y border-ink/10 text-sm">
+              {people.map((a) => (
+                <Agreed key={a.attestationId} icon={<User className="h-4 w-4" />} name={a.attestorId} ok={a.decision === "APPROVE"} />
+              ))}
+              {models.map((a) => (
+                <Agreed
+                  key={a.attestationId}
+                  icon={<Bot className="h-4 w-4" />}
+                  name={`${PROVIDER_NAMES[a.provider as ProviderId] ?? a.provider} (${a.attestorId})${a.isLive === false ? ", test stub" : ""}`}
+                  ok={a.decision === "APPROVE"}
+                />
+              ))}
+            </ul>
+          </div>
+
+          <Footer>
+            {block.parentLockId ? (
+              <Link href={`/l/${block.parentLockId}`} className="px-2 py-2.5 text-sm font-semibold text-steel hover:text-ink">
+                See v{version - 1}
+              </Link>
+            ) : !isPolicy ? (
+              <Link href={`/l/${policyLockId}`} className="px-2 py-2.5 text-sm font-semibold text-steel hover:text-ink">
+                See the policy
+              </Link>
+            ) : (
+              <span />
+            )}
+            <Primary onClick={() => go("verify")}>Next: verify it</Primary>
+          </Footer>
+        </section>
+      ) : null}
+
+      {tab === "verify" ? (
+        <section className="mt-8">
+          <Heading
+            title="Anyone can check it hasn't changed"
+            text="Run the check in your browser, then try changing a single word in a copy and see what happens."
+          />
+          <div className="mt-6">
+            <Verify block={block} serverResult={verification} authorityEphemeral={authorityEphemeral} />
+          </div>
+          <Footer>
+            <Secondary onClick={() => go("record")}>Back</Secondary>
+            {isPolicy ? <StartButton label="Start the demo" /> : <Primary onClick={() => go("build")}>Next: build from it</Primary>}
+          </Footer>
+        </section>
+      ) : null}
+
+      {tab === "build" ? (
+        <section className="mt-8">
+          <Heading
+            title="Teams and AI agents work from this version only"
+            text="Ask the agent a question, or check a backlog ticket against what was agreed."
+          />
+          <div className="mt-6">
+            <Build lockId={block.lockId} questions={questions} sampleTicket={sampleTicket} />
+          </div>
+
+          <div className="mt-10 border-t border-ink/10 pt-8">
+            {!supersededBy ? (
+              <>
+                <h2 className="text-lg font-semibold">Need to change something?</h2>
+                <p className="mt-1 max-w-[60ch] text-[15px] leading-relaxed text-ink/70">
+                  Locked records are never edited. A change becomes version {version + 1}, goes back through review, and replaces
+                  this one once it&apos;s locked.
+                </p>
+                <div className="mt-4">
+                  <StartButton parentLockId={block.lockId} label="Propose a change" />
+                </div>
+              </>
+            ) : null}
+            <p className="mt-8 text-[15px] text-ink/70">
+              That&apos;s Knowledge Lock.{" "}
+              <a href={`${SITE_URL}/#get-started`} className="font-semibold text-accent hover:underline">
+                Talk to us about a pilot
+              </a>
+            </p>
+          </div>
+          <Footer>
+            <Secondary onClick={() => go("verify")}>Back</Secondary>
+            <span />
+          </Footer>
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
+const listNames = (names: string[]) =>
+  names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+
+function Heading({ title, text }: { title: string; text: string }) {
+  return (
+    <div>
+      <h1 className="text-2xl font-semibold leading-tight tracking-tight sm:text-[28px]">{title}</h1>
+      <p className="mt-2 max-w-[60ch] text-[15px] leading-relaxed text-ink/70">{text}</p>
+    </div>
+  );
+}
+
+function Agreed({ icon, name, ok }: { icon: React.ReactNode; name: string; ok: boolean }) {
+  return (
+    <li className="flex items-center justify-between gap-3 py-2.5">
+      <span className="flex items-center gap-2 text-ink/85">
+        <span className="text-muted">{icon}</span>
+        {name}
+      </span>
+      {ok ? (
+        <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-good">
+          <Check className="h-4 w-4" /> Approved
+        </span>
+      ) : (
+        <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-bad">
+          <X className="h-4 w-4" /> Objected
+        </span>
+      )}
+    </li>
+  );
+}
+
+function Footer({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="sticky bottom-0 z-10 -mx-4 mt-8 flex items-center justify-between gap-3 border-t border-ink/10 bg-bg/95 px-4 py-3 backdrop-blur sm:mx-0 sm:px-0">
+      {children}
+    </div>
+  );
+}
+
+function Primary({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+    >
+      {children}
+    </button>
+  );
+}
+
+function Secondary({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="rounded-lg px-2 py-2.5 text-sm font-semibold text-steel hover:text-ink">
+      {children}
+    </button>
+  );
+}

@@ -14,7 +14,7 @@ export default async function RecordPage({ params }: { params: Promise<{ id: str
   const view = await viewRecord(record);
   return (
     <Shell>
-      <Workspace initial={view} policy={POLICY_PAYLOAD.claims} policyTitle={POLICY_PAYLOAD.title} />
+      <Workspace initial={view} policy={POLICY_PAYLOAD.claims} />
     </Shell>
   );
 }

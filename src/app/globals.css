@@ -7,6 +7,7 @@
   --color-ink: var(--text-static);
   --color-accent: var(--text-accent);
   --color-muted: var(--text-inactive);
+  --color-steel: var(--steel);
   --color-good: var(--good);
   --color-warn: var(--warn);
   --color-bad: var(--bad);
@@ -19,6 +20,7 @@
     --text-accent: #ee6c4d;
     --text-inactive: rgba(61, 90, 128, 0.55);
     --ambient-glow: rgba(152, 193, 217, 0.35);
+    --steel: #3d5a80;
     --good: #1f8a5b;
     --warn: #b7791f;
     --bad: #c2412d;
@@ -31,6 +33,7 @@
       --text-accent: #ee6c4d;
       --text-inactive: rgba(152, 193, 217, 0.6);
       --ambient-glow: rgba(61, 90, 128, 0.35);
+      --steel: #98c1d9;
       --good: #4cc38a;
       --warn: #e3b341;
       --bad: #f2785c;
@@ -55,19 +58,3 @@ body {
   }
 }
 
-/* Guided tour highlight */
-[data-tour-highlight] {
-  outline: 2px solid var(--text-accent);
-  outline-offset: 4px;
-  border-radius: 0.75rem;
-  animation: kl-tour-pulse 1.8s ease-in-out infinite;
-}
-
-@keyframes kl-tour-pulse {
-  0%, 100% { outline-color: var(--text-accent); }
-  50% { outline-color: color-mix(in srgb, var(--text-accent) 35%, transparent); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  [data-tour-highlight] { animation: none; }
-}

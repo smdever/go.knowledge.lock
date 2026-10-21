@@ -13,9 +13,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               <Lock className="h-3.5 w-3.5" />
             </span>
             <span>Knowledge Lock</span>
-            <span className="rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-accent">
-              Demo
-            </span>
+            <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-semibold text-accent">Demo</span>
           </Link>
           <a href={SITE_URL} className="hidden text-sm text-muted hover:text-ink sm:inline">
             by Guided Orchestration
