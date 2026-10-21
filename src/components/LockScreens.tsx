@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Bot, Check, Lock, User, X } from "lucide-react";
+import { Bot, Check, Lock, X } from "lucide-react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import type { KnowledgeLockBlock, VerificationResult } from "@/lib/protocol";
 import type { ProviderId, Resolution } from "@/lib/demo/types";
 import { Build, Verify } from "./LockTools";
 import StartButton from "./StartButton";
+import Avatar from "./Avatar";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://guidedorchestration.com";
 const PROVIDER_NAMES: Record<ProviderId, string> = { anthropic: "Anthropic", openai: "OpenAI", google: "Google" };
@@ -157,12 +158,21 @@ export default function LockScreens({
             <h2 className="text-lg font-semibold">Who agreed</h2>
             <ul className="mt-3 divide-y divide-ink/10 border-y border-ink/10 text-sm">
               {people.map((a) => (
-                <Agreed key={a.attestationId} icon={<User className="h-4 w-4" />} name={a.attestorId} ok={a.decision === "APPROVE"} />
+                <Agreed
+                  key={a.attestationId}
+                  icon={<Avatar name={a.attestorId} role={a.role} size={28} />}
+                  name={a.attestorId}
+                  ok={a.decision === "APPROVE"}
+                />
               ))}
               {models.map((a) => (
                 <Agreed
                   key={a.attestationId}
-                  icon={<Bot className="h-4 w-4" />}
+                  icon={
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-ink/5">
+                      <Bot className="h-4 w-4" />
+                    </span>
+                  }
                   name={`${PROVIDER_NAMES[a.provider as ProviderId] ?? a.provider} (${a.attestorId})${a.isLive === false ? ", test stub" : ""}`}
                   ok={a.decision === "APPROVE"}
                 />
@@ -274,7 +284,7 @@ function Heading({ title, text }: { title: string; text: string }) {
 function Agreed({ icon, name, ok }: { icon: React.ReactNode; name: string; ok: boolean }) {
   return (
     <li className="flex items-center justify-between gap-3 py-2.5">
-      <span className="flex items-center gap-2 text-ink/85">
+      <span className="flex items-center gap-2.5 text-ink/85">
         <span className="text-muted">{icon}</span>
         {name}
       </span>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Check, ChevronDown, Loader2, Lock, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
+import Avatar from "./Avatar";
 import type { KnowledgeClaim } from "@/lib/protocol";
 import { api } from "@/lib/demo/client";
 import type { FixSuggestion, ProviderId, RecordView, ReviewIssue, Stakeholder } from "@/lib/demo/types";
@@ -36,7 +37,10 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
   const router = useRouter();
   const [view, setView] = useState(initial);
   const [items, setItems] = useState(initial.record.payload.claims.map((c) => c.statement));
-  const [busy, setBusy] = useState<"" | "saving" | "reviewing" | "locking" | "signing">("");
+  const [busy, setBusy] = useState<"" | "saving" | "reviewing" | "locking">("");
+  // Sign-offs in flight or waiting, by role. They're sent one at a time so none overwrites another.
+  const [pending, setPending] = useState<Record<string, "APPROVE" | "REJECT">>({});
+  const signQueue = useRef<Promise<unknown>>(Promise.resolve());
   const [suggesting, setSuggesting] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<FixSuggestion | null>(null);
   const [error, setError] = useState("");
@@ -170,17 +174,31 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
     }
   }
 
-  async function sign(role: string, decision: "APPROVE" | "REJECT", comment?: string) {
-    const next = await attempt(() => api.signOff(record.id, role, decision, comment), "signing");
-    if (next) adopt(next);
-    return Boolean(next);
+  function sign(role: string, decision: "APPROVE" | "REJECT", comment?: string): Promise<boolean> {
+    setError("");
+    setPending((p) => ({ ...p, [role]: decision }));
+    const run = signQueue.current.then(async () => {
+      try {
+        adopt(await api.signOff(record.id, role, decision, comment));
+        return true;
+      } catch (err) {
+        setError((err as Error).message);
+        return false;
+      } finally {
+        setPending((p) => {
+          const rest = { ...p };
+          delete rest[role];
+          return rest;
+        });
+      }
+    });
+    signQueue.current = run;
+    return run;
   }
 
-  async function signAll() {
+  function signAll() {
     for (const s of stakeholders) {
-      if (signedRoles.has(s.role)) continue;
-      const ok = await sign(s.role, "APPROVE");
-      if (!ok) return;
+      if (!signedRoles.has(s.role) && !pending[s.role]) void sign(s.role, "APPROVE");
     }
   }
 
@@ -415,7 +433,7 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
                 key={s.role}
                 stakeholder={s}
                 attestation={record.attestations.find((a) => a.attestorType === "human" && a.role === s.role)}
-                disabled={Boolean(busy)}
+                pending={pending[s.role]}
                 onSign={(decision, comment) => sign(s.role, decision, comment)}
               />
             ))}
@@ -424,7 +442,7 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
             <button
               type="button"
               onClick={signAll}
-              disabled={Boolean(busy)}
+              disabled={stakeholders.every((s) => signedRoles.has(s.role) || pending[s.role])}
               className="mt-3 text-sm font-semibold text-steel hover:text-ink disabled:opacity-50"
             >
               Sign off for all three
@@ -868,12 +886,12 @@ function ObjectionCard({
 function SignerRow({
   stakeholder,
   attestation,
-  disabled,
+  pending,
   onSign,
 }: {
   stakeholder: Stakeholder;
   attestation?: { decision: string; reasoning?: string };
-  disabled: boolean;
+  pending?: "APPROVE" | "REJECT";
   onSign: (decision: "APPROVE" | "REJECT", comment?: string) => Promise<boolean>;
 }) {
   const [asking, setAsking] = useState(false);
@@ -884,45 +902,60 @@ function SignerRow({
   return (
     <li className="py-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="font-semibold">{stakeholder.name}</p>
-          <p className="text-sm text-muted">{stakeholder.title}</p>
-        </div>
-        {approved ? (
-          <motion.span
-            initial={{ opacity: 0, scale: 0.92 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.2, ease: EASE }}
-            className="inline-flex items-center gap-1 text-sm font-semibold text-good"
-          >
-            <Check className="h-4 w-4" /> Signed off
-          </motion.span>
-        ) : !asking ? (
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setAsking(true)}
-              disabled={disabled}
-              className="text-sm font-semibold text-steel hover:text-ink disabled:opacity-50"
-            >
-              Request changes
-            </button>
-            <button
-              type="button"
-              onClick={() => onSign("APPROVE")}
-              disabled={disabled}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-good/60 px-3 py-1.5 text-sm font-semibold text-good hover:bg-good/10 disabled:opacity-50"
-            >
-              <Check className="h-4 w-4" /> Sign off
-            </button>
+        <div className="flex items-center gap-3">
+          <Avatar name={stakeholder.name} role={stakeholder.role} signed={approved} />
+          <div>
+            <p className="font-semibold">{stakeholder.name}</p>
+            <p className="text-sm text-muted">{stakeholder.title}</p>
           </div>
-        ) : null}
+        </div>
+        <AnimatePresence mode="wait" initial={false}>
+          {approved ? (
+            <motion.span
+              key="signed"
+              initial={{ opacity: 0, scale: 0.92 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.2, ease: EASE }}
+              className="ml-[52px] inline-flex items-center gap-1 text-sm font-semibold text-good sm:ml-0"
+            >
+              <Check className="h-4 w-4" /> Signed off
+            </motion.span>
+          ) : !asking ? (
+            <motion.div
+              key="actions"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="ml-[52px] flex items-center gap-3 sm:ml-0"
+            >
+              <button
+                type="button"
+                onClick={() => setAsking(true)}
+                disabled={Boolean(pending)}
+                className="text-sm font-semibold text-steel hover:text-ink disabled:opacity-40"
+              >
+                Request changes
+              </button>
+              <button
+                type="button"
+                onClick={() => onSign("APPROVE")}
+                disabled={Boolean(pending)}
+                aria-busy={pending === "APPROVE"}
+                className="inline-flex min-w-[6.5rem] items-center justify-center gap-1.5 rounded-lg border border-good/60 px-3 py-1.5 text-sm font-semibold text-good hover:bg-good/10 disabled:cursor-progress"
+              >
+                {pending === "APPROVE" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                {pending === "APPROVE" ? "Signing" : "Sign off"}
+              </button>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </div>
       {rejected && attestation?.reasoning ? (
-        <p className="mt-2 text-sm text-bad">Requested changes: &ldquo;{attestation.reasoning}&rdquo;</p>
+        <p className="mt-2 pl-[52px] text-sm text-bad">Requested changes: &ldquo;{attestation.reasoning}&rdquo;</p>
       ) : null}
       {asking ? (
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:pl-[52px]">
           <input
             value={comment}
             onChange={(e) => setComment(e.target.value)}
@@ -940,10 +973,12 @@ function SignerRow({
                   setComment("");
                 }
               }}
-              disabled={disabled || !comment.trim()}
-              className="rounded-lg bg-bad px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              disabled={Boolean(pending) || !comment.trim()}
+              aria-busy={pending === "REJECT"}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-bad px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
             >
-              Send
+              {pending === "REJECT" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {pending === "REJECT" ? "Sending" : "Send"}
             </button>
             <button type="button" onClick={() => setAsking(false)} className="px-2 text-sm text-muted hover:text-ink">
               Cancel
