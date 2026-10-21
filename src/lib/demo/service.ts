@@ -10,7 +10,8 @@ import {
   type VerificationResult,
 } from "@/lib/protocol";
 import { getAuthorityKey } from "./authority";
-import { callModel, parseJsonObject } from "./models/call";
+import { callModelJson } from "./models/call";
+import { ASK_SCHEMA, DRIFT_SCHEMA, REVIEW_SCHEMA } from "./models/schemas";
 import { isConfigured, providerConfigs, stubEnabled, type ProviderConfig } from "./models/config";
 import { ASK_SYSTEM, DRIFT_SYSTEM, REVIEW_SYSTEM, askUser, driftUser, reviewUser } from "./models/prompts";
 import {
@@ -231,13 +232,15 @@ async function reviewWith(provider: ProviderConfig, record: DemoRecord): Promise
   const started = Date.now();
   const base = { provider: provider.id, model: provider.model, subjectHash: record.payloadHash, issues: [] as ReviewIssue[] };
   try {
-    const text = await callModel(provider, {
+    const raw = await callModelJson(provider, {
       task: "review",
+      schema: REVIEW_SCHEMA,
       system: REVIEW_SYSTEM,
       user: reviewUser(POLICY_PAYLOAD.claims, record.payload.claims, record.payload.title),
+      maxTokens: 3000,
     });
     const validIds = new Set(record.payload.claims.map((c) => c.id));
-    const review = normaliseReview(parseJsonObject(text), validIds);
+    const review = normaliseReview(raw, validIds);
     return { ...base, ...review, status: "ok", durationMs: Date.now() - started, stub: !provider.apiKey };
   } catch (err) {
     return { ...base, status: "error", error: (err as Error).message.slice(0, 300), durationMs: Date.now() - started };
@@ -395,13 +398,13 @@ export async function askAgent(lockId: string, question: unknown, ip: string) {
   const block = await requireRequirementsLock(lockId);
   const provider = pickAgentProvider();
   await chargeModelCalls(ip, 1);
-  const text = await callModel(provider, {
+  const raw = await callModelJson(provider, {
     task: "ask",
+    schema: ASK_SCHEMA,
     system: ASK_SYSTEM,
     user: askUser(POLICY_PAYLOAD.claims, block.payload.claims, block.lockId, q),
-    maxTokens: 800,
+    maxTokens: 1000,
   });
-  const raw = parseJsonObject(text);
   const known = new Set([...block.payload.claims, ...POLICY_PAYLOAD.claims].map((c) => c.id));
   return {
     answer: String(raw.answer ?? "").slice(0, 1200),
@@ -419,13 +422,13 @@ export async function checkDrift(lockId: string, work: unknown, ip: string) {
   const block = await requireRequirementsLock(lockId);
   const provider = pickAgentProvider();
   await chargeModelCalls(ip, 1);
-  const out = await callModel(provider, {
+  const raw = await callModelJson(provider, {
     task: "drift",
+    schema: DRIFT_SCHEMA,
     system: DRIFT_SYSTEM,
     user: driftUser(POLICY_PAYLOAD.claims, block.payload.claims, text),
-    maxTokens: 1500,
+    maxTokens: 2000,
   });
-  const raw = parseJsonObject(out);
   const findings = (Array.isArray(raw.findings) ? raw.findings : [])
     .filter((f): f is Record<string, unknown> => typeof f === "object" && f !== null)
     .map((f) => ({
