@@ -50,3 +50,36 @@ above bound spend. Set spending limits in each provider's console as a backstop.
 - Set `KL_IP_SALT` to any long random string (`openssl rand -base64 32`). IP addresses are only stored as a daily-changing keyed hash for rate limits, and usage rows are deleted after 48 hours.
 - The demo links to the privacy notice and terms on guidedorchestration.com (`NEXT_PUBLIC_SITE_URL`).
 - To delete a demo record on request, remove its rows from `kl_records`, `kl_locks` and `kl_supersessions`. The append-only triggers must be disabled for the delete (`ALTER TABLE kl_locks DISABLE TRIGGER kl_locks_append_only`), then re-enabled straight after.
+
+## The product (app.knowledge-lock.com)
+
+The same repo runs the product when `KL_MODE=app`. It's a second Vercel project with its own database, so the demo above keeps running unchanged. In product mode the demo pages are switched off, and in demo mode the product pages don't exist.
+
+### 1. Supabase (a new project, not the demo's)
+1. Create a project in **London (eu-west-2)**.
+2. **Project Settings → API keys:** copy the Project URL and the publishable key.
+3. **Connect → Transaction pooler:** copy the connection string (port 6543) and add `?sslmode=require`. This is `DATABASE_URL`.
+4. **Authentication → URL Configuration:** Site URL `https://app.knowledge-lock.com`. Add the redirect URL `https://app.knowledge-lock.com/auth/callback**`.
+5. **Authentication → Emails → SMTP settings:** use Resend so sign-in emails aren't rate-limited. Host `smtp.resend.com`, port `465`, user `resend`, password: a Resend API key, sender e.g. `no-reply@knowledge-lock.com` (verify the domain in Resend first).
+6. **Authentication → Emails → Magic link template:** change the link to `{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email`, so a link requested on a laptop also works when opened on a phone.
+
+### 2. Vercel
+Create a second project from this repo (e.g. `knowledge-lock-app`) and add the domain `app.knowledge-lock.com`. Environment variables:
+
+| Variable | Value |
+| --- | --- |
+| `KL_MODE` | `app` |
+| `KL_APP_URL` | `https://app.knowledge-lock.com` |
+| `DATABASE_URL` | The product's Supabase transaction pooler string |
+| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` | From step 1.2 |
+| `KL_ADMIN_EMAILS` | Your email (comma-separate several). Admins can create organisations |
+| `RESEND_API_KEY`, `KL_EMAIL_FROM` | For invite emails, e.g. `Knowledge Lock <no-reply@knowledge-lock.com>` |
+| `KL_AUTHORITY_PRIVATE_KEY`, `KL_AUTHORITY_PUBLIC_KEY` | A new pair for the product: `node scripts/generate-authority-key.mjs` |
+| `NEXT_PUBLIC_SITE_URL` | `https://guidedorchestration.com` |
+| `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` | Needed from phase 2 (model review) |
+
+### 3. First sign-in
+Go to app.knowledge-lock.com, sign in with your admin email, open **Admin** and create an organisation for each design partner. Its owner gets an invite and invites the rest of their team from **Team**. Only people with an account, a pending invite or admin rights are sent sign-in links.
+
+### Running the product locally
+In `.env.local`: `KL_MODE=app`, `KL_DEV_AUTH=1` (sign in as any email without Supabase; never active on Vercel), `KL_ADMIN_EMAILS=you@example.com` and a local `DATABASE_URL`. Invite links are printed in the terminal when Resend isn't set up.

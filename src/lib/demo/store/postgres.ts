@@ -10,12 +10,14 @@ export function databaseUrl(): string | undefined {
 
 const g = globalThis as unknown as { __klSql?: postgres.Sql; __klSchema?: Promise<void> };
 
-function sql(): postgres.Sql {
+/** Shared connection, also used by the product's tables (src/lib/app/db.ts). */
+export function sql(): postgres.Sql {
   if (!g.__klSql) {
     g.__klSql = postgres(databaseUrl() as string, {
       max: 3,
       idle_timeout: 20,
       prepare: false, // works with transaction-mode poolers (Neon, Supabase)
+      onnotice: () => {}, // "already exists, skipping" notices from schema setup
     });
   }
   return g.__klSql;
