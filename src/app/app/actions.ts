@@ -1,6 +1,6 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { appUrl } from "@/lib/mode";
@@ -44,6 +44,16 @@ async function attempt(fn: () => Promise<FormState>): Promise<FormState> {
   }
 }
 
+/** KL_APP_URL when set; otherwise the address this request came in on, so links never point at localhost. */
+async function baseUrl(): Promise<string> {
+  if (process.env.KL_APP_URL) return appUrl();
+  const h = await headers();
+  const host = h.get("x-forwarded-host") || h.get("host");
+  if (!host) return appUrl();
+  const proto = h.get("x-forwarded-proto") || (host.startsWith("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
+}
+
 const cookieOptions = { httpOnly: true, sameSite: "lax" as const, secure: process.env.NODE_ENV === "production", path: "/" };
 const YEAR = 60 * 60 * 24 * 365;
 
@@ -66,7 +76,7 @@ export async function requestSignInLink(_prev: FormState, fd: FormData): Promise
       const supabase = await supabaseServer();
       const { error } = await supabase.auth.signInWithOtp({
         email,
-        options: { emailRedirectTo: `${appUrl()}/auth/callback?next=${encodeURIComponent(next)}`, shouldCreateUser: true },
+        options: { emailRedirectTo: `${await baseUrl()}/auth/callback?next=${encodeURIComponent(next)}`, shouldCreateUser: true },
       });
       if (error) {
         console.error("[knowledge-lock] sign-in link failed", error.message);
@@ -130,7 +140,7 @@ export async function inviteAction(_prev: FormState, fd: FormData): Promise<Form
     const email = checkEmail(str(fd, "email"));
     const role = str(fd, "role") as Role;
     const { token } = await createInvite(org.orgId, user, email, role);
-    const link = `${appUrl()}/invite/${token}`;
+    const link = `${await baseUrl()}/invite/${token}`;
     const mail = inviteEmail({ orgName: org.orgName, inviter: profile?.name || user.email, role: ROLE_LABEL[role].toLowerCase(), url: link });
     const sent = await sendEmail(email, mail.subject, mail.html, mail.text);
     revalidatePath("/app/team");
@@ -171,7 +181,7 @@ export async function createOrgAction(_prev: FormState, fd: FormData): Promise<F
   return attempt(async () => {
     const { user, profile } = await getContext();
     const { name, ownerEmail, token } = await createOrganisation(user, str(fd, "name"), str(fd, "ownerEmail"));
-    const link = `${appUrl()}/invite/${token}`;
+    const link = `${await baseUrl()}/invite/${token}`;
     const mail = inviteEmail({ orgName: name, inviter: profile?.name || "Guided Orchestration", role: "owner", url: link });
     const sent = await sendEmail(ownerEmail, mail.subject, mail.html, mail.text);
     revalidatePath("/app/admin");
