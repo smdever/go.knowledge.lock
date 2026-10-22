@@ -29,9 +29,18 @@ function readDevSession(value: string | undefined): AppUser | null {
   return { id: `dev_${createHmac("sha256", "id").update(email).digest("hex").slice(0, 16)}`, email };
 }
 
+/**
+ * Accepts the names Supabase's own guides and the Vercel integration use, as well as our own.
+ * The publishable (anon) key is safe to expose; the secret/service-role key is never needed.
+ */
 export function supabaseConfig() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY;
+  const env = process.env;
+  const url = env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL;
+  const key =
+    env.SUPABASE_PUBLISHABLE_KEY ||
+    env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    env.SUPABASE_ANON_KEY ||
+    env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   return url && key ? { url, key } : null;
 }
 

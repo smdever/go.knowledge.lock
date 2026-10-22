@@ -19,8 +19,13 @@ export async function proxy(request: NextRequest) {
   if (DEMO_ROUTES.some((r) => r.test(path))) return notFound(request);
   if (path === "/") return NextResponse.redirect(new URL("/app", request.url));
 
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY;
+  const env = process.env;
+  const url = env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL;
+  const key =
+    env.SUPABASE_PUBLISHABLE_KEY ||
+    env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    env.SUPABASE_ANON_KEY ||
+    env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   let response = NextResponse.next({ request });
   if (!url || !key) return response;
 

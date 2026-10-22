@@ -57,7 +57,10 @@ export async function requestSignInLink(_prev: FormState, fd: FormData): Promise
       (await cookies()).set(DEV_COOKIE, devSessionValue(email), cookieOptions);
       redirect(next);
     }
-    if (!supabaseConfig()) throw new AppError("Sign-in isn't configured yet.");
+    if (!supabaseConfig()) {
+      console.error("[knowledge-lock] sign-in needs SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY (or the NEXT_PUBLIC_ versions)");
+      throw new AppError("Sign-in isn't configured yet.");
+    }
     // Same answer either way, so the form doesn't reveal who has access.
     if (await mayRequestSignIn(email)) {
       const supabase = await supabaseServer();
