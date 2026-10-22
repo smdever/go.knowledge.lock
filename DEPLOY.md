@@ -59,9 +59,9 @@ The same repo runs the product when `KL_MODE=app`. It's a second Vercel project 
 1. Create a project in **London (eu-west-2)**.
 2. **Project Settings → API keys:** copy the Project URL and the publishable key.
 3. **Connect → Transaction pooler:** copy the connection string (port 6543) and add `?sslmode=require`. This is `DATABASE_URL`.
-4. **Authentication → URL Configuration:** Site URL `https://app.knowledge-lock.com`. Add the redirect URL `https://app.knowledge-lock.com/auth/callback**`.
+4. **Authentication → URL Configuration:** Site URL `https://app.knowledge-lock.com`. Under Redirect URLs, add `https://app.knowledge-lock.com/**`.
 5. **Authentication → Emails → SMTP settings:** use Resend so sign-in emails aren't rate-limited. Host `smtp.resend.com`, port `465`, user `resend`, password: a Resend API key, sender e.g. `no-reply@knowledge-lock.com` (verify the domain in Resend first).
-6. **Authentication → Emails → Magic link template:** change the link to `{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email`, so a link requested on a laptop also works when opened on a phone.
+6. **Authentication → Emails → Magic link template:** change the link to `{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email&redirect_to={{ .RedirectTo }}`, so a link requested on a laptop also works when opened on a phone.
 
 ### 2. Vercel
 Create a second project from this repo (e.g. `knowledge-lock-app`) and add the domain `app.knowledge-lock.com`. Environment variables:

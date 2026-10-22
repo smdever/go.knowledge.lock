@@ -5,11 +5,23 @@ import { appUrl } from "@/lib/mode";
 
 /**
  * Where the sign-in email lands. Handles both Supabase link styles:
- * `?code=` (opened in the same browser) and `?token_hash=&type=` (works on any device, see DEPLOY.md).
+ * `?code=` (opened in the same browser) and `?token_hash=&type=` (works on any device). The magic-link
+ * email template should be:
+ *   {{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email&redirect_to={{ .RedirectTo }}
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const next = safeNext(url.searchParams.get("next"));
+  // `next` comes straight in, or inside `redirect_to` when the email template passes Supabase's redirect address.
+  let nextParam = url.searchParams.get("next");
+  const redirectTo = url.searchParams.get("redirect_to");
+  if (!nextParam && redirectTo) {
+    try {
+      nextParam = new URL(redirectTo).searchParams.get("next");
+    } catch {
+      nextParam = null;
+    }
+  }
+  const next = safeNext(nextParam);
   const code = url.searchParams.get("code");
   const tokenHash = url.searchParams.get("token_hash");
   const type = url.searchParams.get("type") as EmailOtpType | null;
