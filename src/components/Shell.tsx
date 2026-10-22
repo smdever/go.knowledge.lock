@@ -22,11 +22,22 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       </header>
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-12">{children}</main>
       <footer className="border-t border-ink/10">
-        <div className="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-6 text-xs text-muted sm:flex-row sm:justify-between sm:px-6">
-          <span>Halden Bank and everyone named in this demo are fictional.</span>
-          <a href={SITE_URL} className="hover:text-ink">
-            Guided Orchestration
-          </a>
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-6 text-xs text-muted sm:flex-row sm:justify-between sm:gap-8 sm:px-6">
+          <span>
+            Halden Bank and everyone named in this demo are fictional. Please don&apos;t enter personal or confidential
+            information.
+          </span>
+          <span className="flex shrink-0 gap-4">
+            <a href={`${SITE_URL}/privacy`} className="hover:text-ink">
+              Privacy
+            </a>
+            <a href={`${SITE_URL}/terms`} className="hover:text-ink">
+              Terms
+            </a>
+            <a href={SITE_URL} className="hover:text-ink">
+              Guided Orchestration
+            </a>
+          </span>
         </div>
       </footer>
     </div>

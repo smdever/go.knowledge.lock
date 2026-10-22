@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import {
   computeCanonicalPayloadHash,
   createKnowledgeLock,
@@ -55,13 +56,20 @@ const newId = () => crypto.randomUUID().replace(/-/g, "").slice(0, 16);
 
 // ---------- Rate limiting (model calls) ----------
 
+/**
+ * IP addresses are never stored as-is: the usage key holds a keyed hash that changes every day,
+ * and usage rows are deleted after 48 hours (see the privacy notice).
+ */
+const ipKey = (ip: string, day: string) =>
+  createHmac("sha256", process.env.KL_IP_SALT || "kl-demo-ip-salt").update(`${day}:${ip}`).digest("base64url").slice(0, 22);
+
 export async function chargeModelCalls(ip: string, calls: number): Promise<void> {
   const store = getStore();
   const hour = new Date().toISOString().slice(0, 13);
   const day = hour.slice(0, 10);
   const perIp = Number(process.env.KL_IP_HOURLY_LIMIT || 40);
   const perDay = Number(process.env.KL_DAILY_LIMIT || 800);
-  const ipCount = await store.incrementUsage(`ip:${ip}:${hour}`, calls);
+  const ipCount = await store.incrementUsage(`ip:${ipKey(ip, day)}:${hour}`, calls);
   if (ipCount > perIp) throw new DemoError("You've hit the demo's hourly limit. Please try again later.", 429);
   const dayCount = await store.incrementUsage(`day:${day}`, calls);
   if (dayCount > perDay) throw new DemoError("The demo has reached today's usage limit. Please try again tomorrow.", 429);

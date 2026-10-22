@@ -53,6 +53,7 @@ async function ensureSchema(): Promise<void> {
           key text PRIMARY KEY,
           count integer NOT NULL DEFAULT 0
         )`;
+      await db`ALTER TABLE kl_usage ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()`;
       // Row-level security with no policies: hosts that expose tables over an HTTP API
       // (e.g. Supabase) deny all access through it. The app's own connection owns the
       // tables and is unaffected.
@@ -117,9 +118,11 @@ export const postgresStore: Store = {
   async incrementUsage(key, amount) {
     await ensureSchema();
     const rows = await sql()<{ count: number }[]>`
-      INSERT INTO kl_usage (key, count) VALUES (${key}, ${amount})
-      ON CONFLICT (key) DO UPDATE SET count = kl_usage.count + ${amount}
+      INSERT INTO kl_usage (key, count, updated_at) VALUES (${key}, ${amount}, now())
+      ON CONFLICT (key) DO UPDATE SET count = kl_usage.count + ${amount}, updated_at = now()
       RETURNING count`;
+    // Usage counters are only needed for rate limits: drop anything older than 48 hours.
+    if (Math.random() < 0.05) await sql()`DELETE FROM kl_usage WHERE updated_at < now() - interval '48 hours'`;
     return rows[0].count;
   },
 };

@@ -45,3 +45,8 @@ remove it, review again, sign off as all three, lock, then try the quiet edit, a
 ## Costs and limits
 Each review is one call per provider (3 calls); asking the agent or checking a ticket is one call. The usage caps
 above bound spend. Set spending limits in each provider's console as a backstop.
+
+## Privacy
+- Set `KL_IP_SALT` to any long random string (`openssl rand -base64 32`). IP addresses are only stored as a daily-changing keyed hash for rate limits, and usage rows are deleted after 48 hours.
+- The demo links to the privacy notice and terms on guidedorchestration.com (`NEXT_PUBLIC_SITE_URL`).
+- To delete a demo record on request, remove its rows from `kl_records`, `kl_locks` and `kl_supersessions`. The append-only triggers must be disabled for the delete (`ALTER TABLE kl_locks DISABLE TRIGGER kl_locks_append_only`), then re-enabled straight after.
