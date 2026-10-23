@@ -3,6 +3,7 @@ import {
   createKnowledgeLock,
   evaluateConsensus,
   verifyKnowledgeLock,
+  type Attestation,
   type ConsensusPolicy,
   type KnowledgeClaim,
   type KnowledgeLockBlock,
@@ -45,6 +46,7 @@ import { appDb } from "./db";
 import { noticeEmail, sendEmail } from "./email";
 import { appUrl } from "@/lib/mode";
 import { AppError, audit, getProfile } from "./orgs";
+import { certify, hasPasskey, signingRequest, SIGN_WINDOW_MS, verifySigning } from "./passkeys";
 import type { Role } from "./roles";
 
 export type RecordKind = "requirements" | "policy";
@@ -63,6 +65,8 @@ export interface AppRecord extends DemoRecord {
   createdBy: string;
   signers: SignerRef[];
   quorum: number;
+  /** Whether each sign-off must be signed with the person's own passkey. Set from the organisation when the record starts. */
+  requirePasskeys?: boolean;
   /** Who has been emailed that their sign-off is needed, for which wording. Stops repeat emails. */
   notified?: { hash: string; userIds: string[] };
 }
@@ -77,11 +81,12 @@ interface Org {
   id: string;
   name: string;
   policyLockId: string | null;
+  requirePasskeys: boolean;
 }
 
 async function getOrg(orgId: string): Promise<Org> {
   const db = await appDb();
-  const [o] = await db<Org[]>`SELECT id, name, policy_lock_id AS "policyLockId" FROM kl_organisations WHERE id = ${orgId}`;
+  const [o] = await db<Org[]>`SELECT id, name, policy_lock_id AS "policyLockId", require_passkeys AS "requirePasskeys" FROM kl_organisations WHERE id = ${orgId}`;
   if (!o) throw new DemoError("Organisation not found.", 404);
   return o;
 }
@@ -191,14 +196,19 @@ async function askForSignOffs(record: AppRecord, org: Org, actor: AppUser) {
 // ---------- Rules ----------
 
 /** Models: at least two providers approve with no objections. People: the quorum approves and nobody objects. */
-export function consensusPolicy(record: Pick<AppRecord, "kind" | "quorum" | "signers">): ConsensusPolicy {
+export function consensusPolicy(record: Pick<AppRecord, "kind" | "quorum" | "signers" | "requirePasskeys">): ConsensusPolicy {
   const available = Math.max(1, providerConfigs().filter(isConfigured).length);
   return {
     policyId: `kl-${record.kind}-quorum-v1`,
     name: `${record.quorum} of ${record.signers.length} sign-off`,
-    description: `At least ${Math.min(2, available)} AI models from different providers approve with no objections; ${record.quorum} of the ${record.signers.length} named signers approve and none objects.`,
+    description: `At least ${Math.min(2, available)} AI models from different providers approve with no objections; ${record.quorum} of the ${record.signers.length} named signers approve and none objects${record.requirePasskeys ? ", each signing with their own passkey" : ""}.`,
     modelRules: { minDistinctModels: Math.min(2, available), minDistinctProviders: Math.min(2, available), maxModelRejections: 0 },
-    humanRules: { required: true, minApprovals: record.quorum, allowVeto: true },
+    humanRules: {
+      required: true,
+      minApprovals: record.quorum,
+      allowVeto: true,
+      ...(record.requirePasskeys ? { requirePersonalSignatures: true } : {}),
+    },
     cryptoRules: { hashAlgorithm: "SHA-256", requireSignedAttestations: false },
   };
 }
@@ -249,6 +259,7 @@ export async function viewFor(record: AppRecord, user: AppUser, role: Role): Pro
     claimPrefix: prefixFor(record.kind),
     maxClaims: MAX_CLAIMS,
     kind: record.kind,
+    passkeys: { required: Boolean(record.requirePasskeys), mine: await hasPasskey(user.id) },
   };
 }
 
@@ -314,7 +325,15 @@ export async function createRecord(
   if (role === "viewer") throw new DemoError("Viewers can't create records.", 403);
   const org = await getOrg(orgId);
   const now = Date.now();
-  const base = { id: newId(), orgId, createdBy: user.id, status: "draft" as const, createdAt: now, updatedAt: now };
+  const base = {
+    id: newId(),
+    orgId,
+    createdBy: user.id,
+    status: "draft" as const,
+    createdAt: now,
+    updatedAt: now,
+    ...(org.requirePasskeys ? { requirePasskeys: true } : {}),
+  };
   const empty = { attestations: [], modelReviews: [], resolutions: [], scenarioId: "product" };
 
   // A new version of a locked record: same kind, signers, quorum and wording to start from.
@@ -477,8 +496,13 @@ export async function suggestFix(user: AppUser, id: string, input: { requirement
 
 // ---------- Sign-off and lock ----------
 
-export async function signOff(user: AppUser, id: string, input: { decision?: unknown; comment?: unknown }): Promise<AppRecord> {
-  const { record } = await recordFor(user, id, "read");
+interface SignOffInput {
+  decision?: unknown;
+  comment?: unknown;
+}
+
+/** Checks the person may sign this record, and builds their sign-off for the current wording. */
+async function draftSignOff(user: AppUser, record: AppRecord, input: SignOffInput, timestamp: number) {
   assertDraft(record);
   const signer = record.signers.find((s) => s.userId === user.id);
   if (!signer) throw new DemoError("You're not one of the signers for this record.", 403);
@@ -492,26 +516,65 @@ export async function signOff(user: AppUser, id: string, input: { decision?: unk
   const profile = await getProfile(user.id);
   const name = profile?.name || signer.name;
   const title = profile?.title ?? signer.title;
-
-  record.attestations = record.attestations.filter((a) => !(a.attestorType === "human" && a.role === signerKey(user.id)));
-  record.attestations.push({
+  const attestation: Attestation = {
     attestationId: `att-user-${newId()}`,
     attestorType: "human",
     attestorId: `${name}${title ? `, ${title}` : ""} (${user.email})`,
     role: signerKey(user.id),
-    timestamp: Date.now(),
+    timestamp,
     decision: input.decision,
     metrics: {},
     reasoning: comment || undefined,
     subjectHash: record.payloadHash,
-  });
+  };
+  return { attestation, name, comment };
+}
+
+const PASSKEY_NEEDED = "Your organisation asks everyone to sign with their own passkey. Add one on your Profile page, then sign off.";
+
+/**
+ * Step one of a sign-off: whether the person signs with a passkey and, if so, what their passkey must sign.
+ * The challenge is the hash of the exact sign-off, so the signature covers the wording, decision and comment.
+ */
+export async function signOffRequest(user: AppUser, id: string, input: SignOffInput) {
+  const { record } = await recordFor(user, id, "read");
+  const timestamp = Date.now();
+  const { attestation } = await draftSignOff(user, record, input, timestamp);
+  const mine = await hasPasskey(user.id);
+  if (!mine) {
+    if (record.requirePasskeys) throw new DemoError(PASSKEY_NEEDED, 403);
+    return { passkey: false as const };
+  }
+  return { passkey: true as const, timestamp, options: await signingRequest(user.id, attestation) };
+}
+
+export async function signOff(user: AppUser, id: string, input: SignOffInput & { timestamp?: unknown; passkey?: unknown }): Promise<AppRecord> {
+  const { record } = await recordFor(user, id, "read");
+  const signed = input.passkey !== undefined && input.passkey !== null;
+  let timestamp = Date.now();
+  if (signed) {
+    const t = Number(input.timestamp);
+    if (!Number.isFinite(t) || Math.abs(timestamp - t) > SIGN_WINDOW_MS) {
+      throw new DemoError("That sign-off took too long. Please sign again.", 409);
+    }
+    timestamp = t;
+  } else if (record.requirePasskeys || (await hasPasskey(user.id))) {
+    // Anyone with a passkey always signs with it, so an unsigned sign-off can't be slipped in for them.
+    throw new DemoError(record.requirePasskeys && !(await hasPasskey(user.id)) ? PASSKEY_NEEDED : "Sign with your passkey.", 403);
+  }
+  const { attestation, name, comment } = await draftSignOff(user, record, input, timestamp);
+  if (signed) attestation.personalSignature = await verifySigning(user.id, attestation, input.passkey);
+
+  record.attestations = record.attestations.filter((a) => !(a.attestorType === "human" && a.role === signerKey(user.id)));
+  record.attestations.push(attestation);
   record.updatedAt = Date.now();
   await saveRecord(record);
-  await audit(record.orgId, user, input.decision === "APPROVE" ? "record.approved" : "record.objected", record.id, {
+  await audit(record.orgId, user, attestation.decision === "APPROVE" ? "record.approved" : "record.objected", record.id, {
     version: record.version,
     ...(comment ? { comment } : {}),
+    ...(signed ? { passkey: true } : {}),
   });
-  if (input.decision === "REJECT") {
+  if (attestation.decision === "REJECT") {
     const org = await getOrg(record.orgId);
     await notify(
       [await emailOf(record.createdBy), ...record.signers.map((s) => s.email)],
@@ -529,11 +592,38 @@ export async function signOff(user: AppUser, id: string, input: { decision?: unk
   return record;
 }
 
+/** When someone removes a passkey, sign-offs it made on drafts stop counting; they sign again. */
+export async function withdrawPasskeySignOffs(userId: string, credentialId: string): Promise<number> {
+  const db = await appDb();
+  const rows = await db<{ data: AppRecord }[]>`
+    SELECT r.data FROM kl_app_records r JOIN kl_members m ON m.org_id = r.org_id AND m.user_id = ${userId}
+    WHERE r.status = 'draft'`;
+  let n = 0;
+  for (const { data: record } of rows) {
+    const keep = record.attestations.filter(
+      (a) => !(a.role === signerKey(userId) && a.personalSignature?.credentialId === credentialId)
+    );
+    if (keep.length === record.attestations.length) continue;
+    record.attestations = keep;
+    record.updatedAt = Date.now();
+    await saveRecord(record);
+    n++;
+  }
+  return n;
+}
+
 export async function lockRecord(user: AppUser, id: string): Promise<string> {
   const { record } = await recordFor(user, id, "edit");
   assertDraft(record);
+  // The lock authority certifies each passkey used. A sign-off made with a passkey since removed stops counting.
+  const certified = await Promise.all(record.attestations.map((a) => certify(a)));
+  if (certified.some((a) => a === null)) {
+    record.attestations = record.attestations.filter((_, i) => certified[i] !== null);
+    await saveRecord(record);
+  }
+  const attestations = certified.filter((a): a is Attestation => a !== null);
   const policy = consensusPolicy(record);
-  const evaluation = evaluateConsensus(record.attestations, policy, record.payloadHash);
+  const evaluation = evaluateConsensus(attestations, policy, record.payloadHash);
   if (!evaluation.passed) throw new DemoError(`Not ready to lock: ${evaluation.failures.join(" ")}`, 409);
   if (record.parentLockId && (await postgresStore.getSupersededBy(record.parentLockId))) {
     throw new DemoError("The previous version has already been replaced by another change.", 409);
@@ -541,7 +631,7 @@ export async function lockRecord(user: AppUser, id: string): Promise<string> {
   const key = await getAuthorityKey();
   const block = await createKnowledgeLock({
     payload: record.payload,
-    attestations: record.attestations,
+    attestations,
     policy,
     parentLockId: record.parentLockId,
     authorityPrivateKey: key.privateKey,

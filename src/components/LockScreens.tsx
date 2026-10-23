@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Bot, Check, Lock, X } from "lucide-react";
+import { Bot, Check, KeyRound, Lock, X } from "lucide-react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import type { KnowledgeLockBlock, VerificationResult } from "@/lib/protocol";
 import type { ProviderId, Resolution } from "@/lib/demo/types";
@@ -173,6 +173,7 @@ export default function LockScreens({
                   icon={<Avatar name={a.attestorId} role={a.role} size={28} />}
                   name={a.attestorId}
                   ok={a.decision === "APPROVE"}
+                  note={a.personalSignature ? "Signed with their own passkey" : undefined}
                 />
               ))}
               {models.map((a) => (
@@ -301,12 +302,19 @@ function Heading({ title, text }: { title: string; text: string }) {
   );
 }
 
-function Agreed({ icon, name, ok }: { icon: React.ReactNode; name: string; ok: boolean }) {
+function Agreed({ icon, name, ok, note }: { icon: React.ReactNode; name: string; ok: boolean; note?: string }) {
   return (
     <li className="flex items-center justify-between gap-3 py-2.5">
       <span className="flex items-center gap-2.5 text-ink/85">
         <span className="text-muted">{icon}</span>
-        {name}
+        <span>
+          {name}
+          {note ? (
+            <span className="mt-0.5 flex items-center gap-1 text-xs text-muted">
+              <KeyRound className="h-3 w-3" /> {note}
+            </span>
+          ) : null}
+        </span>
       </span>
       {ok ? (
         <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-good">

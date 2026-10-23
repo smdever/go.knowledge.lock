@@ -87,6 +87,9 @@ Go to app.knowledge-lock.com, sign in with your admin email, open **Admin** and 
 ### Agent API
 Owners create API keys under **API** (`/app/api-keys`). Agents call `https://app.knowledge-lock.com/api/v1/…` with `Authorization: Bearer kl_live_…`. The API is read-only: list and fetch locks, the policy, ask, check and export. Keys are stored as hashes; the full key is shown once. Docs: guidedorchestration.com/docs/knowledge-lock-api. The demo site returns 404 for `/api/v1`.
 
+### Personal signing keys (passkeys)
+People add passkeys on **Profile**; owners can require them under **Team**. Passkeys are tied to the site's address, taken from `KL_APP_URL`, so keep it set to exactly `https://app.knowledge-lock.com`. Passkeys made there won't work on preview deployments or another domain. Only public keys are stored (`kl_passkeys`). At lock time the authority key certifies each passkey used, and the lock's verification checks every signature, in the browser and through the API.
+
 ### How records work in the product
 - An owner proposes the organisation's **Policy** first (optional but recommended). Every later record is reviewed against it.
 - Anyone who is an owner or signer creates a **New record**: a title, one statement per line, the people who must sign it, and how many of them must approve (the quorum).

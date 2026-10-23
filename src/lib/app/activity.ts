@@ -57,6 +57,14 @@ export async function listActivity(orgId: string, limit = 200): Promise<Activity
         return { ...base, text: `changed ${r.target}'s role from ${roleName(d.from)} to ${roleName(d.to)}` };
       case "member.removed":
         return { ...base, text: `removed ${r.target}` };
+      case "passkey.added":
+        return { ...base, text: `added a passkey (${r.target})` };
+      case "passkey.removed":
+        return { ...base, text: `removed a passkey (${r.target})` };
+      case "org.passkeys_required":
+        return { ...base, text: "made passkeys required for sign-offs on new records" };
+      case "org.passkeys_optional":
+        return { ...base, text: "made passkeys optional for sign-offs on new records" };
       case "api_key.created":
         return { ...base, text: `created the API key "${r.target}"` };
       case "api_key.revoked":
@@ -73,9 +81,9 @@ export async function listActivity(orgId: string, limit = 200): Promise<Activity
           href: recordHref,
         };
       case "record.approved":
-        return { ...base, text: `signed off ${record}${v}`, href: recordHref };
+        return { ...base, text: `signed off ${record}${v}${d.passkey ? " with their passkey" : ""}`, href: recordHref };
       case "record.objected":
-        return { ...base, text: `asked for changes to ${record}${v}`, note: d.comment ? `"${d.comment}"` : undefined, href: recordHref };
+        return { ...base, text: `asked for changes to ${record}${v}${d.passkey ? ", signed with their passkey" : ""}`, note: d.comment ? `"${d.comment}"` : undefined, href: recordHref };
       case "record.locked":
         return { ...base, text: `locked ${record}${v}`, href: typeof d.lockId === "string" ? `/app/l/${d.lockId}` : recordHref };
       default:

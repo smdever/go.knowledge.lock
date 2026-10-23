@@ -495,7 +495,13 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
             }
             text={
               product
-                ? `${quorum === signers.length ? "Everyone listed" : `${quorum} of the ${signers.length} people listed`} must approve this exact wording. An objection from anyone blocks the lock until they withdraw it or the wording changes. You can only sign for yourself.`
+                ? `${quorum === signers.length ? "Everyone listed" : `${quorum} of the ${signers.length} people listed`} must approve this exact wording. An objection from anyone blocks the lock until they withdraw it or the wording changes. You can only sign for yourself.${
+                    view.passkeys?.required
+                      ? " Each sign-off must be signed with the person's own passkey."
+                      : view.passkeys?.mine
+                        ? " Your sign-off will be signed with your passkey."
+                        : ""
+                  }`
                 : "Each person approves this exact wording. In a pilot they'd each sign in from their own account; here you can act for all three."
             }
           />
@@ -510,6 +516,14 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
               />
             ))}
           </ul>
+          {product && view.passkeys && !view.passkeys.mine && signers.some((s) => s.canSign) ? (
+            <p className={`mt-3 text-sm ${view.passkeys.required ? "text-bad" : "text-ink/65"}`}>
+              {view.passkeys.required ? "You need a passkey to sign this. " : "Want your sign-off signed on your own device? "}
+              <Link href="/app/profile#passkeys" className="font-semibold text-steel underline hover:text-ink">
+                Set up a passkey
+              </Link>
+            </p>
+          ) : null}
           {!product && !allSigned ? (
             <button
               type="button"
@@ -964,7 +978,7 @@ function SignerRow({
   onSign,
 }: {
   signer: SignerView;
-  attestation?: { decision: string; reasoning?: string };
+  attestation?: { decision: string; reasoning?: string; personalSignature?: unknown };
   pending?: "APPROVE" | "REJECT";
   onSign: (decision: "APPROVE" | "REJECT", comment?: string) => Promise<boolean>;
 }) {
@@ -992,7 +1006,7 @@ function SignerRow({
               transition={{ duration: 0.2, ease: EASE }}
               className="ml-[52px] inline-flex items-center gap-1 text-sm font-semibold text-good sm:ml-0"
             >
-              <Check className="h-4 w-4" /> Signed off
+              <Check className="h-4 w-4" /> {attestation?.personalSignature ? "Signed off with passkey" : "Signed off"}
             </motion.span>
           ) : !signer.canSign ? (
             <span key="waiting" className="ml-[52px] text-sm text-muted sm:ml-0">
@@ -1030,7 +1044,9 @@ function SignerRow({
         </AnimatePresence>
       </div>
       {rejected && attestation?.reasoning ? (
-        <p className="mt-2 pl-[52px] text-sm text-bad">Requested changes: &ldquo;{attestation.reasoning}&rdquo;</p>
+        <p className="mt-2 pl-[52px] text-sm text-bad">
+          Requested changes: &ldquo;{attestation.reasoning}&rdquo;{attestation.personalSignature ? " (signed with passkey)" : ""}
+        </p>
       ) : null}
       {asking ? (
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:pl-[52px]">

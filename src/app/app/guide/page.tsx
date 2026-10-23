@@ -23,6 +23,7 @@ const SECTIONS = [
   ["ai", "What the AI reviewers do"],
   ["change", "Changing a locked record"],
   ["use", "Using a locked record"],
+  ["passkeys", "Signing with a passkey"],
   ["api", "Connecting your own AI agents"],
   ["emails", "Emails you'll get"],
   ["data", "Your data"],
@@ -146,6 +147,19 @@ export default async function GuidePage() {
         <li>
           <strong>Check a ticket.</strong> Paste a ticket, user story or spec to see where it departs from what was agreed.
         </li>
+      </ul>
+
+      <H2 id="passkeys">Signing with a passkey</H2>
+      <P>
+        Set up a passkey on your <strong>Profile</strong> page and every sign-off you give is signed on your own device, with Touch
+        ID, Face ID, Windows Hello, your phone or a security key. The signature covers the exact wording, your decision and any
+        comment, and it goes into the lock. Anyone checking the lock can then confirm it was you, without having to trust us.
+      </P>
+      <ul className="mt-3 list-disc space-y-2 pl-5 text-[15px] leading-relaxed text-ink/80">
+        <li>Once you have a passkey, you always sign with it.</li>
+        <li>An owner can make passkeys required under <strong>Team</strong>. Records started after that only accept signed sign-offs.</li>
+        <li>You&apos;ll get an email whenever a passkey is added to or removed from your account.</li>
+        <li>Removing a passkey withdraws the sign-offs it made on records that aren&apos;t locked yet, so you&apos;d sign those again.</li>
       </ul>
 
       <H2 id="api">Connecting your own AI agents</H2>

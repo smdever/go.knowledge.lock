@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 import Avatar from "@/components/Avatar";
-import { InviteForm, RemoveForm, RoleForm } from "@/components/app/forms";
-import { changeRoleAction, inviteAction, removeMemberAction, revokeInviteAction } from "@/app/app/actions";
+import { InviteForm, RemoveForm, RequirePasskeysForm, RoleForm } from "@/components/app/forms";
+import { changeRoleAction, inviteAction, removeMemberAction, revokeInviteAction, setRequirePasskeysAction } from "@/app/app/actions";
 import { getContext } from "@/lib/app/context";
-import { listInvites, listMembers } from "@/lib/app/orgs";
+import { listInvites, listMembers, requiresPasskeys } from "@/lib/app/orgs";
+import { usersWithPasskeys } from "@/lib/app/passkeys";
 import { ROLE_HELP, ROLE_LABEL, ROLES } from "@/lib/app/roles";
 
 const fmt = (d: Date) => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(d);
@@ -13,7 +14,8 @@ export default async function TeamPage() {
   if (!ctx.current) redirect("/app");
   const org = ctx.current;
   const owner = org.role === "owner";
-  const [members, invites] = await Promise.all([listMembers(org.orgId), listInvites(org.orgId)]);
+  const [members, invites, required] = await Promise.all([listMembers(org.orgId), listInvites(org.orgId), requiresPasskeys(org.orgId)]);
+  const withKeys = await usersWithPasskeys(members.map((m) => m.userId));
 
   return (
     <div className="max-w-4xl">
@@ -45,6 +47,7 @@ export default async function TeamPage() {
                     </p>
                     <p className="truncate text-sm text-ink/60">
                       {[m.title, m.email].filter(Boolean).join(" · ")} · joined {fmt(m.joinedAt)}
+                      {m.role !== "viewer" ? (withKeys.has(m.userId) ? " · has a passkey" : " · no passkey yet") : ""}
                     </p>
                   </div>
                 </div>
@@ -79,6 +82,19 @@ export default async function TeamPage() {
               </li>
             ))}
           </ul>
+        </section>
+      ) : null}
+
+      {owner ? (
+        <section className="mt-10">
+          <h2 className="text-lg font-semibold">Personal signatures</h2>
+          <p className="mt-1 max-w-2xl text-sm text-ink/65">
+            Anyone with a passkey already signs their sign-offs with it. You can make it a rule, so a sign-off only counts when it is
+            signed on the person&apos;s own device.
+          </p>
+          <div className="mt-4 max-w-2xl">
+            <RequirePasskeysForm action={setRequirePasskeysAction} on={required} />
+          </div>
         </section>
       ) : null}
 

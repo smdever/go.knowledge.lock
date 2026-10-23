@@ -89,6 +89,8 @@ export interface RecordView {
   kind?: "requirements" | "policy";
   providers: { id: ProviderId; model: string; configured: boolean }[];
   policyLockId: string;
+  /** Product only: whether sign-offs need a passkey, and whether the viewer has one. */
+  passkeys?: { required: boolean; mine: boolean };
 }
 
 /** A person who signs a record off. In the demo, a fictional stakeholder anyone can act for; in the product, a real member. */

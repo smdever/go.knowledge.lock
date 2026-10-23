@@ -83,6 +83,13 @@ export function Verify({
         <Row ok={!result.tamperDetected} label="Content matches its fingerprint" failLabel="Content does not match its fingerprint" />
         <Row ok={result.consensusSatisfied} label="Sign-off rules met for this exact content" failLabel="Sign-off rules not met for this content" />
         <Row ok={result.signatureValid !== false} label="Lock signature valid" failLabel="Lock signature invalid" />
+        {result.personalSignatures ? (
+          <Row
+            ok={result.personalSignatures.valid === result.personalSignatures.total}
+            label={`${result.personalSignatures.total} personal passkey signature${result.personalSignatures.total === 1 ? "" : "s"} valid`}
+            failLabel={`${result.personalSignatures.total - result.personalSignatures.valid} of ${result.personalSignatures.total} personal signatures invalid`}
+          />
+        ) : null}
       </ul>
       <p className="mt-3 text-xs text-muted">Checked in {result.where}.</p>
       <dl className="mt-4 space-y-1 font-mono text-[11px] text-muted">

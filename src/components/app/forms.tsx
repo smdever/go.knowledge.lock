@@ -2,9 +2,11 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { Check, Copy, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Check, Copy, KeyRound, Loader2 } from "lucide-react";
 import type { FormState } from "@/app/app/actions";
 import { ROLE_LABEL, ROLES, type Role } from "@/lib/app/roles";
+import { addPasskey } from "@/lib/app/passkey-client";
 
 type Action = (prev: FormState, fd: FormData) => Promise<FormState>;
 
@@ -211,6 +213,60 @@ export function ApiKeyForm({ action }: { action: Action }) {
         <input id="key-name" name="name" required maxLength={60} placeholder="e.g. Delivery agent, Jira sync" className={`${inputClass} sm:flex-1`} />
         <Submit>Create key</Submit>
       </div>
+      <Result state={state} />
+    </form>
+  );
+}
+
+/** Adds a passkey on this device: the browser asks for Touch ID, Face ID, Windows Hello, a phone or a security key. */
+export function AddPasskeyButton({ first }: { first: boolean }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [state, setState] = useState<FormState>({});
+  async function add() {
+    setBusy(true);
+    setState({});
+    try {
+      await addPasskey();
+      setState({ message: "Passkey added. Your sign-offs will now be signed with it." });
+      router.refresh();
+    } catch (err) {
+      setState({ error: (err as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={add}
+        disabled={busy}
+        className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
+      >
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+        {first ? "Set up a passkey" : "Add another passkey"}
+      </button>
+      <Result state={state} />
+    </div>
+  );
+}
+
+export function RequirePasskeysForm({ action, on }: { action: Action; on: boolean }) {
+  const [state, formAction] = useActionState(action, {});
+  return (
+    <form action={formAction}>
+      <label className="flex items-start gap-3 text-[15px]">
+        <input type="checkbox" name="require" defaultChecked={on} className="mt-1 h-4 w-4 accent-accent" />
+        <span>
+          <span className="font-semibold">Require a passkey for every sign-off</span>
+          <span className="block text-sm text-ink/65">
+            Applies to records started after you save. Drafts already under way keep their current rule. Make sure your signers
+            have set up a passkey on their Profile page first.
+          </span>
+        </span>
+      </label>
+      <Submit className="mt-4">Save</Submit>
       <Result state={state} />
     </form>
   );

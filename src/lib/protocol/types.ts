@@ -1,3 +1,5 @@
+import type { PersonalSignature } from "./personal";
+
 /**
  * Knowledge Lock Protocol (KLP) Core Types
  * Designed to be zero-dependency, runtime-agnostic, and pluggable across stacks.
@@ -71,6 +73,7 @@ export interface Attestation {
   signature?: string;          // Hex or base64 signature
   publicKey?: string;          // Public key or DID to verify attestation signature
   isLive?: boolean;            // True if generated via live frontier API call
+  personalSignature?: PersonalSignature; // A person's own passkey signature over this sign-off
 }
 
 /**
@@ -98,6 +101,7 @@ export interface ConsensusPolicy {
     minApprovals: number;           // e.g. 2 human expert sign-offs
     requiredRoles?: string[];       // e.g. ["domain_expert", "security_officer"]
     allowVeto: boolean;             // If true, 1 REJECT fails consensus
+    requirePersonalSignatures?: boolean; // If true, only sign-offs carrying a personal signature count
   };
 
   // Cryptographic requirements

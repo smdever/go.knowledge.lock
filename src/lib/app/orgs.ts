@@ -129,6 +129,20 @@ export async function removeMember(orgId: string, actor: AppUser, userId: string
   await audit(orgId, actor, "member.removed", target.email);
 }
 
+/** Owners can require every sign-off to be signed with the person's own passkey. Applies to records started from now on. */
+export async function setRequirePasskeys(orgId: string, actor: AppUser, on: boolean) {
+  await requireRole(orgId, actor, ["owner"]);
+  const db = await appDb();
+  const rows = await db`UPDATE kl_organisations SET require_passkeys = ${on} WHERE id = ${orgId} AND require_passkeys <> ${on} RETURNING id`;
+  if (rows.length) await audit(orgId, actor, on ? "org.passkeys_required" : "org.passkeys_optional");
+}
+
+export async function requiresPasskeys(orgId: string): Promise<boolean> {
+  const db = await appDb();
+  const [o] = await db<{ on: boolean }[]>`SELECT require_passkeys AS on FROM kl_organisations WHERE id = ${orgId}`;
+  return Boolean(o?.on);
+}
+
 // ---------- Invites ----------
 
 export interface PendingInvite {

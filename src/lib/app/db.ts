@@ -1,7 +1,7 @@
 import { databaseUrl, ensureSchema, markSchema, schemaIsCurrent, sql } from "@/lib/demo/store/postgres";
 
 /** Bump when the statements below change (see schemaIsCurrent). */
-const APP_SCHEMA_VERSION = 2;
+const APP_SCHEMA_VERSION = 3;
 
 const g = globalThis as unknown as { __klAppSchema?: Promise<void> };
 
@@ -87,10 +87,34 @@ export async function appDb() {
           last_used_at timestamptz,
           revoked_at timestamptz
         )`;
+      // Personal signing keys: each person's passkeys. Only public keys are stored.
+      await db`
+        CREATE TABLE IF NOT EXISTS kl_passkeys (
+          id text PRIMARY KEY,
+          user_id text NOT NULL,
+          public_key bytea NOT NULL,
+          jwk jsonb NOT NULL,
+          alg integer NOT NULL,
+          counter bigint NOT NULL DEFAULT 0,
+          transports text[] NOT NULL DEFAULT '{}',
+          name text NOT NULL,
+          synced boolean NOT NULL DEFAULT false,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          last_used_at timestamptz,
+          removed_at timestamptz
+        )`;
+      await db`CREATE INDEX IF NOT EXISTS kl_passkeys_user ON kl_passkeys (user_id)`;
+      await db`
+        CREATE TABLE IF NOT EXISTS kl_passkey_challenges (
+          user_id text PRIMARY KEY,
+          challenge text NOT NULL,
+          expires_at timestamptz NOT NULL
+        )`;
+      await db`ALTER TABLE kl_organisations ADD COLUMN IF NOT EXISTS require_passkeys boolean NOT NULL DEFAULT false`;
       await db`CREATE INDEX IF NOT EXISTS kl_members_user ON kl_members (user_id)`;
       await db`CREATE INDEX IF NOT EXISTS kl_invites_org ON kl_invites (org_id)`;
       await db`CREATE INDEX IF NOT EXISTS kl_audit_org ON kl_audit (org_id, at)`;
-      for (const table of ["kl_organisations", "kl_profiles", "kl_members", "kl_invites", "kl_audit", "kl_app_records", "kl_api_keys"]) {
+      for (const table of ["kl_organisations", "kl_profiles", "kl_members", "kl_invites", "kl_audit", "kl_app_records", "kl_api_keys", "kl_passkeys", "kl_passkey_challenges"]) {
         await db.unsafe(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`);
       }
       // The audit log is append-only, like locks.

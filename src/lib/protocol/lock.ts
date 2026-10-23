@@ -1,6 +1,7 @@
 import { canonicalizeJson } from "./canonicalize";
 import { CryptoProvider, defaultCryptoProvider } from "./crypto";
 import { evaluateConsensus } from "./consensus";
+import { verifyPersonalSignature } from "./personal";
 import {
   KnowledgePayload,
   Attestation,
@@ -23,6 +24,8 @@ export interface VerificationResult {
   tamperDetected: boolean;
   consensusSatisfied: boolean;
   signatureValid?: boolean;
+  /** People who signed their own sign-off with a passkey, and how many of those signatures check out. */
+  personalSignatures?: { total: number; valid: number };
   computedHash: string;
   recordedHash: string;
   errors: string[];
@@ -127,11 +130,33 @@ export async function verifyKnowledgeLock(
     }
   }
 
+  // 4. Verify each person's own signature, and that the authority certified their passkey
+  const signedHumans = block.consensus.attestations.filter((a) => a.attestorType === "human" && a.personalSignature);
+  let personalSignatures: VerificationResult["personalSignatures"];
+  if (signedHumans.length) {
+    let ok = 0;
+    for (const a of signedHumans) {
+      const check = await verifyPersonalSignature(a, {
+        requireCertificate: true,
+        authorityPublicKey: block.signatures.signerPublicKey,
+        crypto,
+      });
+      if (check.valid) ok++;
+      else errors.push(...check.errors);
+    }
+    personalSignatures = { total: signedHumans.length, valid: ok };
+  }
+
   return {
-    valid: !tamperDetected && consensusSatisfied && (signatureValid !== false),
+    valid:
+      !tamperDetected &&
+      consensusSatisfied &&
+      signatureValid !== false &&
+      (!personalSignatures || personalSignatures.valid === personalSignatures.total),
     tamperDetected,
     consensusSatisfied,
     signatureValid,
+    personalSignatures,
     computedHash,
     recordedHash: block.canonicalHash,
     errors,

@@ -2,6 +2,7 @@
 
 import { createContext, useContext } from "react";
 import { makeApi, type Api } from "@/lib/demo/client";
+import { productSignOff } from "@/lib/app/passkey-client";
 
 /** Where the shared screens send requests and link to: the public demo, or the signed-in product. */
 export interface KL {
@@ -12,7 +13,13 @@ export interface KL {
 }
 
 const DEMO: KL = { mode: "demo", api: makeApi("/api"), recordPath: (id) => `/r/${id}`, lockPath: (id) => `/l/${id}` };
-const APP: KL = { mode: "app", api: makeApi("/api/app"), recordPath: (id) => `/app/r/${id}`, lockPath: (id) => `/app/l/${id}` };
+// In the product, a sign-off is signed with the person's own passkey when they have one.
+const APP: KL = {
+  mode: "app",
+  api: { ...makeApi("/api/app"), signOff: (id, _role, decision, comment) => productSignOff(id, decision, comment) },
+  recordPath: (id) => `/app/r/${id}`,
+  lockPath: (id) => `/app/l/${id}`,
+};
 
 const Ctx = createContext<KL>(DEMO);
 

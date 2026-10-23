@@ -22,7 +22,14 @@ export function evaluateConsensus(
   }
 
   const modelAttestations = attestations.filter((a) => a.attestorType === "model");
-  const humanAttestations = attestations.filter((a) => a.attestorType === "human");
+  const allHuman = attestations.filter((a) => a.attestorType === "human");
+  // Whether each signature is genuine is checked by verifyKnowledgeLock; here, unsigned sign-offs simply don't count.
+  const humanAttestations = policy.humanRules.requirePersonalSignatures
+    ? allHuman.filter((a) => a.personalSignature)
+    : allHuman;
+  if (humanAttestations.length < allHuman.length) {
+    warnings.push(`${allHuman.length - humanAttestations.length} sign-off(s) had no personal signature and were ignored.`);
+  }
 
   const modelApprovals = modelAttestations.filter((a) => a.decision === "APPROVE");
   const modelRejections = modelAttestations.filter((a) => a.decision === "REJECT");

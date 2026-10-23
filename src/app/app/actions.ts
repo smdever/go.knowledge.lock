@@ -20,8 +20,11 @@ import {
   revokeInvite,
   ROLE_LABEL,
   saveProfile,
+  setRequirePasskeys,
   type Role,
 } from "@/lib/app/orgs";
+import { removePasskey } from "@/lib/app/passkeys";
+import { withdrawPasskeySignOffs } from "@/lib/app/records";
 
 export interface FormState {
   error?: string;
@@ -206,6 +209,31 @@ export async function createOrgAction(_prev: FormState, fd: FormData): Promise<F
     return {
       message: sent ? `${name} created. Invite sent to ${ownerEmail}.` : `${name} created. Email isn't set up yet, so send ${ownerEmail} this link:`,
       link: sent ? undefined : link,
+    };
+  });
+}
+
+// ---------- Personal signing keys ----------
+
+export async function removePasskeyAction(fd: FormData) {
+  const user = await getUser();
+  if (!user) redirect("/signin");
+  const id = str(fd, "id");
+  if (await removePasskey(user, id)) await withdrawPasskeySignOffs(user.id, id);
+  revalidatePath("/app/profile");
+}
+
+export async function setRequirePasskeysAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  return attempt(async () => {
+    const { user, current } = await getContext("/app/team");
+    if (!current) throw new AppError("Choose an organisation first.");
+    const on = str(fd, "require") === "on";
+    await setRequirePasskeys(current.orgId, user, on);
+    revalidatePath("/app/team");
+    return {
+      message: on
+        ? "Done. From now on, new records need each sign-off to be signed with a passkey."
+        : "Done. New records accept sign-offs without a passkey. People who have one still sign with it.",
     };
   });
 }
