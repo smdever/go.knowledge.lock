@@ -46,6 +46,7 @@ import { appDb } from "./db";
 import { noticeEmail, sendEmail } from "./email";
 import { appUrl } from "@/lib/mode";
 import { AppError, audit, getProfile } from "./orgs";
+import { postToChannels } from "./channels";
 import { certify, hasPasskey, signingRequest, SIGN_WINDOW_MS, verifySigning } from "./passkeys";
 import type { Role } from "./roles";
 
@@ -191,6 +192,15 @@ async function askForSignOffs(record: AppRecord, org: Org, actor: AppUser) {
       url: recordUrl(record.id),
     })
   );
+  const waiting = record.signers.filter((s) => !signed.has(signerKey(s.userId)));
+  await postToChannels(record.orgId, "signoff_needed", {
+    orgName: org.name,
+    headline: `Sign-off needed: ${record.payload.title} (v${record.version})`,
+    lines: [`The AI reviewers have approved it. ${record.quorum} of ${record.signers.length} signers need to approve before it can be locked.`],
+    people: waiting.map((s) => ({ name: s.name, email: s.email })),
+    cta: "Review and sign off",
+    url: recordUrl(record.id),
+  });
 }
 
 // ---------- Rules ----------
@@ -588,6 +598,16 @@ export async function signOff(user: AppUser, id: string, input: SignOffInput & {
         url: recordUrl(record.id),
       })
     );
+    const creatorEmail = await emailOf(record.createdBy);
+    const creator = await getProfile(record.createdBy);
+    await postToChannels(record.orgId, "changes_requested", {
+      orgName: org.name,
+      headline: `Changes requested: ${record.payload.title} (v${record.version})`,
+      lines: [`${name}: "${comment}"`, "Nothing can be locked until they approve or the wording changes."],
+      people: creatorEmail && record.createdBy !== user.id ? [{ name: creator?.name ?? creatorEmail, email: creatorEmail }] : [],
+      cta: "Open the record",
+      url: recordUrl(record.id),
+    });
   }
   return record;
 }
@@ -664,6 +684,18 @@ export async function lockRecord(user: AppUser, id: string): Promise<string> {
       url: lockUrl(block.lockId),
     })
   );
+  await postToChannels(record.orgId, "locked", {
+    orgName: org.name,
+    headline: `Locked: ${record.payload.title} (v${record.version})`,
+    lines: [
+      record.kind === "policy"
+        ? "This is now the organisation's policy. New records are checked against it."
+        : "This is now the signed-off version. Teams and AI agents work from exactly this wording.",
+    ],
+    people: [],
+    cta: "See the locked record",
+    url: lockUrl(block.lockId),
+  });
   return block.lockId;
 }
 

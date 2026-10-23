@@ -79,6 +79,7 @@ Create a second project from this repo (e.g. `knowledge-lock-app`) and add the d
 | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` | Needed from phase 2 (model review) |
 | `KL_ORG_HOURLY_LIMIT` | Optional. AI calls per organisation per hour (default 300) |
 | `KL_API_HOURLY_LIMIT`, `KL_API_DAILY_LIMIT` | Optional. Agent API requests per key per hour (default 1000) and per organisation per day (default 10000) |
+| `KL_SECRETS_KEY` | Recommended. A long random string (`openssl rand -hex 32`) used to encrypt Slack and Teams webhook links. If unset, a key derived from `KL_AUTHORITY_PRIVATE_KEY` is used. Changing it means owners must reconnect their channels |
 | `KL_SUPPORT_EMAIL` | Optional. The help address shown in the in-app guide (default `hello@guidedorchestration.com`) |
 
 ### 3. First sign-in
@@ -89,6 +90,9 @@ Owners create API keys under **API** (`/app/api-keys`). Agents call `https://app
 
 ### Personal signing keys (passkeys)
 People add passkeys on **Profile**; owners can require them under **Team**. Passkeys are tied to the site's address, taken from `KL_APP_URL`, so keep it set to exactly `https://app.knowledge-lock.com`. Passkeys made there won't work on preview deployments or another domain. Only public keys are stored (`kl_passkeys`). At lock time the authority key certifies each passkey used, and the lock's verification checks every signature, in the browser and through the API.
+
+### Slack and Teams
+Owners connect channels under **Slack & Teams** (`/app/integrations`) by pasting a channel webhook link: a Slack Incoming Webhook, or a Teams Workflows "Post to a channel when a webhook request is received" link. Only `hooks.slack.com`, `*.logic.azure.com` and `*.powerplatform.com` over HTTPS are accepted. Links are stored encrypted (`kl_channels`). A channel is paused after 10 failed posts in a row; sending a test from the page starts it again.
 
 ### How records work in the product
 - An owner proposes the organisation's **Policy** first (optional but recommended). Every later record is reviewed against it.

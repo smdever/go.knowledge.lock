@@ -65,6 +65,10 @@ export async function listActivity(orgId: string, limit = 200): Promise<Activity
         return { ...base, text: "made passkeys required for sign-offs on new records" };
       case "org.passkeys_optional":
         return { ...base, text: "made passkeys optional for sign-offs on new records" };
+      case "channel.added":
+        return { ...base, text: `connected the ${d.kind === "teams" ? "Teams" : "Slack"} channel "${r.target}"` };
+      case "channel.removed":
+        return { ...base, text: `disconnected the ${d.kind === "teams" ? "Teams" : "Slack"} channel "${r.target}"` };
       case "api_key.created":
         return { ...base, text: `created the API key "${r.target}"` };
       case "api_key.revoked":

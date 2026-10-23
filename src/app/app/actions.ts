@@ -24,6 +24,8 @@ import {
   type Role,
 } from "@/lib/app/orgs";
 import { removePasskey } from "@/lib/app/passkeys";
+import { addChannel, checkSlackId, removeChannel, testChannel } from "@/lib/app/channels";
+import { appDb } from "@/lib/app/db";
 import { withdrawPasskeySignOffs } from "@/lib/app/records";
 
 export interface FormState {
@@ -235,5 +237,56 @@ export async function setRequirePasskeysAction(_prev: FormState, fd: FormData): 
         ? "Done. From now on, new records need each sign-off to be signed with a passkey."
         : "Done. New records accept sign-offs without a passkey. People who have one still sign with it.",
     };
+  });
+}
+
+// ---------- Slack and Teams ----------
+
+async function ownerOrg() {
+  const { user, current } = await getContext("/app/integrations");
+  if (!current) throw new AppError("Choose an organisation first.");
+  return { user, current };
+}
+
+export async function addChannelAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  return attempt(async () => {
+    const { user, current } = await ownerOrg();
+    const channel = await addChannel(current.orgId, user, {
+      kind: str(fd, "kind"),
+      name: str(fd, "name"),
+      url: str(fd, "url"),
+      events: fd.getAll("events"),
+    });
+    const test = await testChannel(current.orgId, user, channel.id, current.orgName);
+    revalidatePath("/app/integrations");
+    return test.ok
+      ? { message: `Connected ${channel.name}. We posted a test message there.` }
+      : { error: `Saved ${channel.name}, but the test message failed: ${test.error}` };
+  });
+}
+
+export async function testChannelAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  return attempt(async () => {
+    const { user, current } = await ownerOrg();
+    const test = await testChannel(current.orgId, user, str(fd, "id"), current.orgName);
+    revalidatePath("/app/integrations");
+    return test.ok ? { message: "Test message sent." } : { error: test.error };
+  });
+}
+
+export async function removeChannelAction(fd: FormData) {
+  const { user, current } = await ownerOrg();
+  await removeChannel(current.orgId, user, str(fd, "id"));
+  revalidatePath("/app/integrations");
+}
+
+export async function saveSlackIdAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  return attempt(async () => {
+    const { user } = await getContext("/app/profile");
+    const id = checkSlackId(str(fd, "slackId"));
+    const db = await appDb();
+    await db`UPDATE kl_profiles SET slack_member_id = ${id}, updated_at = now() WHERE user_id = ${user.id}`;
+    revalidatePath("/app/profile");
+    return { message: id ? "Saved. Slack notices will @mention you." : "Removed." };
   });
 }

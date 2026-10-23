@@ -20,7 +20,7 @@ export function LegalFooter({ links = [] }: { links?: { href: string; label: str
   return (
     <footer className="border-t border-ink/10">
       {links.length ? (
-        <nav aria-label="More" className="mx-auto flex max-w-6xl flex-wrap gap-x-5 gap-y-2 px-4 pt-6 text-sm sm:hidden">
+        <nav aria-label="More" className="mx-auto flex max-w-6xl flex-wrap gap-x-5 gap-y-2 px-4 pt-6 text-sm lg:hidden">
           {links.map((l) => (
             <Link key={l.href} href={l.href} className="text-ink/70 hover:text-ink">{l.label}</Link>
           ))}
@@ -53,7 +53,7 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
 }
 
 export default function AppShell({ ctx, children }: { ctx: AppContext; children: React.ReactNode }) {
-  // `more` links sit in the header from tablet width up, and in the footer on phones.
+  // `more` links sit in the header on wide screens, and in the footer on phones and tablets.
   const nav: { href: string; label: string; more?: boolean }[] = [
     { href: "/app", label: "Home" },
     ...(ctx.current
@@ -64,6 +64,7 @@ export default function AppShell({ ctx, children }: { ctx: AppContext; children:
             ? [
                 { href: "/app/activity", label: "Activity", more: true },
                 { href: "/app/api-keys", label: "API", more: true },
+                { href: "/app/integrations", label: "Slack & Teams", more: true },
               ]
             : []),
         ]
@@ -102,7 +103,7 @@ export default function AppShell({ ctx, children }: { ctx: AppContext; children:
           <div className="flex items-center gap-4 text-sm">
             <nav className="flex items-center gap-3 sm:gap-4">
               {nav.map((n) => (
-                <Link key={n.href} href={n.href} className={`text-ink/70 hover:text-ink ${n.more ? "hidden sm:inline" : ""}`}>
+                <Link key={n.href} href={n.href} className={`whitespace-nowrap text-ink/70 hover:text-ink ${n.more ? "hidden lg:inline" : ""}`}>
                   {n.label}
                 </Link>
               ))}

@@ -1,7 +1,7 @@
 import { databaseUrl, ensureSchema, markSchema, schemaIsCurrent, sql } from "@/lib/demo/store/postgres";
 
 /** Bump when the statements below change (see schemaIsCurrent). */
-const APP_SCHEMA_VERSION = 3;
+const APP_SCHEMA_VERSION = 4;
 
 const g = globalThis as unknown as { __klAppSchema?: Promise<void> };
 
@@ -111,10 +111,31 @@ export async function appDb() {
           expires_at timestamptz NOT NULL
         )`;
       await db`ALTER TABLE kl_organisations ADD COLUMN IF NOT EXISTS require_passkeys boolean NOT NULL DEFAULT false`;
+      // Slack and Teams channel webhooks. The link is encrypted (see channels.ts).
+      await db`
+        CREATE TABLE IF NOT EXISTS kl_channels (
+          id text PRIMARY KEY,
+          org_id text NOT NULL REFERENCES kl_organisations(id),
+          kind text NOT NULL CHECK (kind IN ('slack', 'teams')),
+          name text NOT NULL,
+          url_sealed text NOT NULL,
+          hint text NOT NULL,
+          events text[] NOT NULL,
+          created_by text NOT NULL,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          last_ok_at timestamptz,
+          last_error text,
+          last_error_at timestamptz,
+          failures integer NOT NULL DEFAULT 0,
+          paused_at timestamptz,
+          removed_at timestamptz
+        )`;
+      await db`CREATE INDEX IF NOT EXISTS kl_channels_org ON kl_channels (org_id)`;
+      await db`ALTER TABLE kl_profiles ADD COLUMN IF NOT EXISTS slack_member_id text`;
       await db`CREATE INDEX IF NOT EXISTS kl_members_user ON kl_members (user_id)`;
       await db`CREATE INDEX IF NOT EXISTS kl_invites_org ON kl_invites (org_id)`;
       await db`CREATE INDEX IF NOT EXISTS kl_audit_org ON kl_audit (org_id, at)`;
-      for (const table of ["kl_organisations", "kl_profiles", "kl_members", "kl_invites", "kl_audit", "kl_app_records", "kl_api_keys", "kl_passkeys", "kl_passkey_challenges"]) {
+      for (const table of ["kl_organisations", "kl_profiles", "kl_members", "kl_invites", "kl_audit", "kl_app_records", "kl_api_keys", "kl_passkeys", "kl_passkey_challenges", "kl_channels"]) {
         await db.unsafe(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`);
       }
       // The audit log is append-only, like locks.

@@ -271,3 +271,101 @@ export function RequirePasskeysForm({ action, on }: { action: Action; on: boolea
     </form>
   );
 }
+
+export function SlackIdForm({ action, value }: { action: Action; value?: string | null }) {
+  const [state, formAction] = useActionState(action, {});
+  return (
+    <form action={formAction}>
+      <label htmlFor="slackId" className="block text-sm font-semibold">Slack member ID (optional)</label>
+      <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+        <input id="slackId" name="slackId" maxLength={24} defaultValue={value ?? ""} placeholder="U0123ABCD" className={`${inputClass} font-mono sm:flex-1`} />
+        <Submit>Save</Submit>
+      </div>
+      <p className="mt-1 text-xs text-muted">In Slack, open your profile, then ⋮ › Copy member ID. Lets our Slack notices @mention you.</p>
+      <Result state={state} />
+    </form>
+  );
+}
+
+const EVENTS: { id: string; label: string; help: string }[] = [
+  { id: "signoff_needed", label: "Sign-off needed", help: "When the AI reviewers approve a draft, mentioning who still has to sign" },
+  { id: "changes_requested", label: "Changes requested", help: "When a signer asks for changes, with their comment" },
+  { id: "locked", label: "Locked", help: "When a record or the policy is locked" },
+];
+
+export function AddChannelForm({ action }: { action: Action }) {
+  const [state, formAction] = useActionState(action, {});
+  const [kind, setKind] = useState<"slack" | "teams">("slack");
+  const formRef = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    if (state.message) formRef.current?.reset();
+  }, [state]);
+  return (
+    <form ref={formRef} action={formAction} className="space-y-4">
+      <fieldset>
+        <legend className="text-sm font-semibold">Where</legend>
+        <div className="mt-2 flex gap-2">
+          {(["slack", "teams"] as const).map((k) => (
+            <label key={k} className={`cursor-pointer rounded-lg border px-4 py-2 text-sm font-semibold ${kind === k ? "border-accent text-ink" : "border-ink/20 text-ink/60"}`}>
+              <input type="radio" name="kind" value={k} checked={kind === k} onChange={() => setKind(k)} className="sr-only" />
+              {k === "slack" ? "Slack" : "Microsoft Teams"}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <div>
+        <label htmlFor="channel-name" className="block text-sm font-semibold">Channel name</label>
+        <input id="channel-name" name="name" required maxLength={60} placeholder={kind === "slack" ? "#delivery-signoffs" : "Delivery › Sign-offs"} className={`mt-2 ${inputClass}`} />
+      </div>
+      <div>
+        <label htmlFor="channel-url" className="block text-sm font-semibold">Webhook link</label>
+        <input id="channel-url" name="url" required type="url" autoComplete="off" spellCheck={false}
+          placeholder={kind === "slack" ? "https://hooks.slack.com/services/…" : "https://….powerplatform.com/… or https://….logic.azure.com/…"}
+          className={`mt-2 ${inputClass} font-mono text-sm`} />
+        <p className="mt-1 text-xs text-muted">
+          {kind === "slack"
+            ? "In Slack: create an app at api.slack.com/apps, turn on Incoming Webhooks, add one for the channel and copy its link."
+            : "In Teams: open the channel's ⋯ menu › Workflows › “Post to a channel when a webhook request is received”, then copy the link it gives you."}{" "}
+          Treat the link like a password. We store it encrypted.
+        </p>
+      </div>
+      <fieldset>
+        <legend className="text-sm font-semibold">Post when</legend>
+        <div className="mt-2 space-y-2">
+          {EVENTS.map((e) => (
+            <label key={e.id} className="flex items-start gap-3 text-[15px]">
+              <input type="checkbox" name="events" value={e.id} defaultChecked className="mt-1 h-4 w-4 accent-accent" />
+              <span>
+                {e.label}
+                <span className="block text-sm text-ink/60">{e.help}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <Submit>Connect and send a test</Submit>
+      <Result state={state} />
+    </form>
+  );
+}
+
+export function TestChannelButton({ action, id }: { action: Action; id: string }) {
+  const [state, formAction] = useActionState(action, {});
+  return (
+    <form action={formAction} className="inline">
+      <input type="hidden" name="id" value={id} />
+      <TextSubmit>Send a test</TextSubmit>
+      {state.message ? <span className="ml-2 text-sm text-good">{state.message}</span> : null}
+      {state.error ? <span className="ml-2 text-sm text-bad">{state.error}</span> : null}
+    </form>
+  );
+}
+
+function TextSubmit({ children }: { children: React.ReactNode }) {
+  const { pending } = useFormStatus();
+  return (
+    <button type="submit" disabled={pending} className="text-sm font-semibold text-steel hover:text-ink disabled:opacity-50">
+      {pending ? "Sending…" : children}
+    </button>
+  );
+}

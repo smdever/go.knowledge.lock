@@ -1,5 +1,6 @@
-import { AddPasskeyButton, ProfileForm } from "@/components/app/forms";
-import { removePasskeyAction, saveProfileAction } from "@/app/app/actions";
+import { AddPasskeyButton, ProfileForm, SlackIdForm } from "@/components/app/forms";
+import { removePasskeyAction, saveProfileAction, saveSlackIdAction } from "@/app/app/actions";
+import { appDb } from "@/lib/app/db";
 import { getContext } from "@/lib/app/context";
 import { listPasskeys } from "@/lib/app/passkeys";
 
@@ -8,12 +9,17 @@ const fmt = (d: Date) => new Intl.DateTimeFormat("en-GB", { day: "numeric", mont
 export default async function ProfilePage() {
   const ctx = await getContext("/app/profile");
   const passkeys = await listPasskeys(ctx.user.id);
+  const db = await appDb();
+  const [slack] = await db<{ id: string | null }[]>`SELECT slack_member_id AS id FROM kl_profiles WHERE user_id = ${ctx.user.id}`;
   return (
     <div className="max-w-xl">
       <h1 className="text-3xl font-semibold tracking-tight">Profile</h1>
       <p className="mt-2 text-sm text-ink/65">Signed in as {ctx.user.email}</p>
       <div className="mt-8 max-w-md">
         <ProfileForm action={saveProfileAction} name={ctx.profile?.name} title={ctx.profile?.title} submit="Save" />
+        <div className="mt-8">
+          <SlackIdForm action={saveSlackIdAction} value={slack?.id} />
+        </div>
       </div>
 
       <section className="mt-12" id="passkeys">

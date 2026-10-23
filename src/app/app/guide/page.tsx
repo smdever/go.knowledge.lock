@@ -26,6 +26,7 @@ const SECTIONS = [
   ["passkeys", "Signing with a passkey"],
   ["api", "Connecting your own AI agents"],
   ["emails", "Emails you'll get"],
+  ["slack", "Slack and Teams"],
   ["data", "Your data"],
   ["help", "Getting help"],
 ] as const;
@@ -180,6 +181,14 @@ export default async function GuidePage() {
         <li>When someone asks for changes to a record you created or are signing.</li>
         <li>When a record you&apos;re involved in is locked.</li>
       </ul>
+
+      <H2 id="slack">Slack and Teams</H2>
+      <P>
+        Owners can connect Slack or Microsoft Teams channels under <strong>Slack &amp; Teams</strong>. Knowledge Lock then posts there
+        when a sign-off is needed, when someone asks for changes, and when something is locked, with a button back to the record.
+        In Teams you&apos;re @mentioned by your work email. In Slack, add your Slack member ID on your <strong>Profile</strong> page to
+        be @mentioned.
+      </P>
 
       <H2 id="data">Your data</H2>
       <ul className="mt-3 list-disc space-y-2 pl-5 text-[15px] leading-relaxed text-ink/80">
