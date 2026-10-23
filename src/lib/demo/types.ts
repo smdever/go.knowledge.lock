@@ -77,6 +77,29 @@ export interface RecordView {
   record: DemoRecord;
   evaluation: ConsensusEvaluationResult;
   stakeholders: Stakeholder[];
+  // ---- Product only (left out in the demo, which uses its three fixed stakeholders)
+  signers?: SignerView[];
+  /** How many approvals the lock needs. */
+  quorum?: number;
+  /** False for viewers: they can read a draft but not change or review it. */
+  canEdit?: boolean;
+  /** "R" for requirements, "P" for policies. */
+  claimPrefix?: string;
+  maxClaims?: number;
+  kind?: "requirements" | "policy";
   providers: { id: ProviderId; model: string; configured: boolean }[];
   policyLockId: string;
+}
+
+/** A person who signs a record off. In the demo, a fictional stakeholder anyone can act for; in the product, a real member. */
+export interface SignerView {
+  /** Matches the `role` on that person's human attestation: the demo role, or `user:<id>` in the product. */
+  key: string;
+  name: string;
+  title: string;
+  email?: string;
+  /** Used to colour the demo's avatars. */
+  avatarRole?: string;
+  /** Whether the person looking at the page can sign for this signer. */
+  canSign: boolean;
 }

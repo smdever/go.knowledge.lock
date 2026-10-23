@@ -47,12 +47,12 @@ export class DemoError extends Error {
 }
 
 const MAX_REQUIREMENTS = 12;
-const MAX_STATEMENT = 600;
-const MAX_TITLE = 120;
-const MAX_QUESTION = 400;
-const MAX_WORK_ITEM = 4000;
+export const MAX_STATEMENT = 600;
+export const MAX_TITLE = 120;
+export const MAX_QUESTION = 400;
+export const MAX_WORK_ITEM = 4000;
 
-const newId = () => crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+export const newId = () => crypto.randomUUID().replace(/-/g, "").slice(0, 16);
 
 // ---------- Rate limiting (model calls) ----------
 
@@ -64,15 +64,28 @@ const ipKey = (ip: string, day: string) =>
   createHmac("sha256", process.env.KL_IP_SALT || "kl-demo-ip-salt").update(`${day}:${ip}`).digest("base64url").slice(0, 22);
 
 export async function chargeModelCalls(ip: string, calls: number): Promise<void> {
+  const day = new Date().toISOString().slice(0, 10);
+  await chargeUsage(`ip:${ipKey(ip, day)}`, calls, {
+    perHour: Number(process.env.KL_IP_HOURLY_LIMIT || 40),
+    perDay: Number(process.env.KL_DAILY_LIMIT || 800),
+    hourMessage: "You've hit the demo's hourly limit. Please try again later.",
+    dayMessage: "The demo has reached today's usage limit. Please try again tomorrow.",
+  });
+}
+
+/** Hourly cap per key (an IP hash in the demo, an organisation in the product) plus a daily cap overall. */
+export async function chargeUsage(
+  key: string,
+  calls: number,
+  limits: { perHour: number; perDay: number; hourMessage: string; dayMessage: string; dayKey?: string }
+): Promise<void> {
   const store = getStore();
   const hour = new Date().toISOString().slice(0, 13);
   const day = hour.slice(0, 10);
-  const perIp = Number(process.env.KL_IP_HOURLY_LIMIT || 40);
-  const perDay = Number(process.env.KL_DAILY_LIMIT || 800);
-  const ipCount = await store.incrementUsage(`ip:${ipKey(ip, day)}:${hour}`, calls);
-  if (ipCount > perIp) throw new DemoError("You've hit the demo's hourly limit. Please try again later.", 429);
-  const dayCount = await store.incrementUsage(`day:${day}`, calls);
-  if (dayCount > perDay) throw new DemoError("The demo has reached today's usage limit. Please try again tomorrow.", 429);
+  const keyCount = await store.incrementUsage(`${key}:${hour}`, calls);
+  if (keyCount > limits.perHour) throw new DemoError(limits.hourMessage, 429);
+  const dayCount = await store.incrementUsage(`${limits.dayKey ?? "day"}:${day}`, calls);
+  if (dayCount > limits.perDay) throw new DemoError(limits.dayMessage, 429);
 }
 
 // ---------- Seeded policy lock ----------
@@ -203,8 +216,8 @@ export async function createRecord(parentLockId?: string): Promise<DemoRecord> {
  * Works out which current objections an edit resolved. A blocker raised against a requirement whose
  * wording is gone from the new draft counts as reworded (something new at the same position) or removed.
  */
-function resolvedBy(
-  record: DemoRecord,
+export function resolvedBy(
+  record: Pick<DemoRecord, "modelReviews" | "payloadHash" | "payload">,
   next: string[],
   hint?: { requirementId: string; provider: ProviderId }
 ): Resolution[] {
@@ -234,6 +247,26 @@ function resolvedBy(
   return out;
 }
 
+/** Cleans the edited list of statements; empty lines are dropped. */
+export function parseStatements(raw: unknown, max: number, tooMany: string): string[] {
+  if (!Array.isArray(raw)) throw new DemoError("Requirements are missing.");
+  const statements = raw
+    .map((r) => (typeof r === "string" ? r : typeof r?.statement === "string" ? r.statement : ""))
+    .map((s: string) => s.trim().slice(0, MAX_STATEMENT))
+    .filter(Boolean);
+  if (statements.length === 0) throw new DemoError("Add at least one requirement.");
+  if (statements.length > max) throw new DemoError(tooMany);
+  return statements;
+}
+
+/** Which model's suggestion an edit came from, when the person accepted a suggested fix. */
+export function fixHint(raw: unknown): { requirementId: string; provider: ProviderId } | undefined {
+  const fix = raw as { requirementId?: unknown; provider?: unknown } | undefined;
+  return fix && typeof fix.requirementId === "string" && ["anthropic", "openai", "google"].includes(String(fix.provider))
+    ? { requirementId: fix.requirementId, provider: fix.provider as ProviderId }
+    : undefined;
+}
+
 function assertDraft(record: DemoRecord) {
   if (record.status !== "draft") throw new DemoError("This record is locked. Propose a change to create a new version.", 409);
 }
@@ -248,21 +281,10 @@ export async function updateRecord(
 
   const title = typeof input.title === "string" ? input.title.trim().slice(0, MAX_TITLE) : record.payload.title;
   if (!title) throw new DemoError("Give the record a title.");
-  if (!Array.isArray(input.requirements)) throw new DemoError("Requirements are missing.");
-  const statements = input.requirements
-    .map((r) => (typeof r === "string" ? r : typeof r?.statement === "string" ? r.statement : ""))
-    .map((s: string) => s.trim().slice(0, MAX_STATEMENT))
-    .filter(Boolean);
-  if (statements.length === 0) throw new DemoError("Add at least one requirement.");
-  if (statements.length > MAX_REQUIREMENTS) throw new DemoError(`Keep it to ${MAX_REQUIREMENTS} requirements for the demo.`);
-
+  const statements = parseStatements(input.requirements, MAX_REQUIREMENTS, `Keep it to ${MAX_REQUIREMENTS} requirements for the demo.`);
   const claims = statements.map((statement: string, i: number) => ({ id: `R${i + 1}`, statement }));
   const policyLockId = String(record.payload.metadata?.policyLockId ?? (await ensurePolicyLock()));
-  const fix = input.fix as { requirementId?: unknown; provider?: unknown } | undefined;
-  const hint =
-    fix && typeof fix.requirementId === "string" && ["anthropic", "openai", "google"].includes(String(fix.provider))
-      ? { requirementId: fix.requirementId, provider: fix.provider as ProviderId }
-      : undefined;
+  const hint = fixHint(input.fix);
   const resolutions = [...(record.resolutions ?? []), ...resolvedBy(record, statements, hint)].slice(-10);
   record.resolutions = resolutions;
   record.payload = buildPayload(record, title, claims, policyLockId, resolutions);
@@ -279,7 +301,7 @@ export async function updateRecord(
 
 const ISSUE_TYPES: IssueType[] = ["conflict", "ambiguity", "gap", "risk"];
 
-function normaliseReview(raw: Record<string, unknown>, validIds: Set<string>): Pick<ModelReview, "decision" | "summary" | "issues"> {
+export function normaliseReview(raw: Record<string, unknown>, validIds: Set<string>): Pick<ModelReview, "decision" | "summary" | "issues"> {
   const issues: ReviewIssue[] = (Array.isArray(raw.issues) ? raw.issues : [])
     .filter((i): i is Record<string, unknown> => typeof i === "object" && i !== null)
     .map((i) => {
@@ -301,15 +323,20 @@ function normaliseReview(raw: Record<string, unknown>, validIds: Set<string>): P
   return { decision, summary: String(raw.summary ?? "").slice(0, 400), issues };
 }
 
-async function reviewWith(provider: ProviderConfig, record: DemoRecord): Promise<ModelReview> {
+export async function reviewWith(
+  provider: ProviderConfig,
+  record: Pick<DemoRecord, "payload" | "payloadHash">,
+  policyClaims: KnowledgeClaim[] = POLICY_PAYLOAD.claims,
+  system: string = REVIEW_SYSTEM
+): Promise<ModelReview> {
   const started = Date.now();
   const base = { provider: provider.id, model: provider.model, subjectHash: record.payloadHash, issues: [] as ReviewIssue[] };
   try {
     const raw = await callModelJson(provider, {
       task: "review",
       schema: REVIEW_SCHEMA,
-      system: REVIEW_SYSTEM,
-      user: reviewUser(POLICY_PAYLOAD.claims, record.payload.claims, record.payload.title),
+      system,
+      user: reviewUser(policyClaims, record.payload.claims, record.payload.title),
       maxTokens: 3000,
     });
     const validIds = new Set(record.payload.claims.map((c) => c.id));
@@ -336,6 +363,14 @@ export async function runReview(id: string, ip: string): Promise<DemoRecord> {
     throw new DemoError("The requirements changed during review. Run the review again.", 409);
   }
 
+  mergeReviews(latest, reviews);
+  latest.updatedAt = Date.now();
+  await getStore().saveRecord(latest);
+  return latest;
+}
+
+/** Replaces each reviewing model's earlier review and attestation with the new one. */
+export function mergeReviews(latest: Pick<DemoRecord, "modelReviews" | "attestations">, reviews: ModelReview[]): void {
   const reviewed = new Set(reviews.map((r) => r.provider));
   latest.modelReviews = [...latest.modelReviews.filter((r) => !reviewed.has(r.provider)), ...reviews];
   latest.attestations = latest.attestations.filter((a) => !(a.attestorType === "model" && reviewed.has(a.provider as never)));
@@ -358,9 +393,6 @@ export async function runReview(id: string, ip: string): Promise<DemoRecord> {
       isLive: !r.stub,
     });
   }
-  latest.updatedAt = Date.now();
-  await getStore().saveRecord(latest);
-  return latest;
 }
 
 /** Asks the model that objected to a requirement to propose compliant wording. Nothing is changed until accepted. */
@@ -484,7 +516,7 @@ export async function getLockView(lockId: string): Promise<LockView | null> {
   };
 }
 
-function pickAgentProvider(): ProviderConfig {
+export function pickAgentProvider(): ProviderConfig {
   const preferred = (process.env.KL_AGENT_PROVIDER as ProviderConfig["id"]) || "anthropic";
   const all = providerConfigs().filter(isConfigured);
   const p = all.find((x) => x.id === preferred) ?? all[0];

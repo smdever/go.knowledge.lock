@@ -9,6 +9,7 @@ import type { ProviderId, Resolution } from "@/lib/demo/types";
 import { Build, Verify } from "./LockTools";
 import StartButton from "./StartButton";
 import Avatar from "./Avatar";
+import { useKL } from "./KLContext";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://guidedorchestration.com";
 const PROVIDER_NAMES: Record<ProviderId, string> = { anthropic: "Anthropic", openai: "OpenAI", google: "Google" };
@@ -28,6 +29,7 @@ export default function LockScreens({
   isNew,
   questions,
   sampleTicket,
+  canPropose = true,
 }: {
   block: KnowledgeLockBlock;
   verification: VerificationResult;
@@ -38,7 +40,11 @@ export default function LockScreens({
   isNew: boolean;
   questions: string[];
   sampleTicket: string;
+  /** Product viewers can read and verify a lock but not start a new version. */
+  canPropose?: boolean;
 }) {
+  const { mode, lockPath } = useKL();
+  const product = mode === "app";
   const [tab, setTab] = useState<Tab>("record");
   const version = Number(block.payload.metadata?.version ?? 1);
   const resolutions = (block.payload.metadata?.resolutions as Resolution[] | undefined) ?? [];
@@ -65,7 +71,7 @@ export default function LockScreens({
       {supersededBy ? (
         <p className="mb-6 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2.5 text-sm text-warn">
           A newer version has replaced this one.{" "}
-          <Link href={`/l/${supersededBy}`} className="font-semibold underline">
+          <Link href={lockPath(supersededBy)} className="font-semibold underline">
             Open the current version
           </Link>
         </p>
@@ -114,8 +120,12 @@ export default function LockScreens({
             title={isNew ? "Locked. This is now the signed-off version" : block.payload.title}
             text={
               isPolicy
-                ? "The bank's complaints policy, seeded for this demo. New requirements are checked against it."
-                : "Teams and AI agents work from exactly this wording. Anyone with the link sees the same version."
+                ? product
+                  ? "Your organisation's locked policy. Every new record is checked against it."
+                  : "The bank's complaints policy, seeded for this demo. New requirements are checked against it."
+                : product
+                  ? "Teams and AI agents work from exactly this wording. Everyone in your organisation sees the same version."
+                  : "Teams and AI agents work from exactly this wording. Anyone with the link sees the same version."
             }
           />
           <ol className="mt-6 divide-y divide-ink/10 border-y border-ink/10">
@@ -182,11 +192,11 @@ export default function LockScreens({
 
           <Footer>
             {block.parentLockId ? (
-              <Link href={`/l/${block.parentLockId}`} className="px-2 py-2.5 text-sm font-semibold text-steel hover:text-ink">
+              <Link href={lockPath(block.parentLockId)} className="px-2 py-2.5 text-sm font-semibold text-steel hover:text-ink">
                 See v{version - 1}
               </Link>
-            ) : !isPolicy ? (
-              <Link href={`/l/${policyLockId}`} className="px-2 py-2.5 text-sm font-semibold text-steel hover:text-ink">
+            ) : !isPolicy && policyLockId ? (
+              <Link href={lockPath(policyLockId)} className="px-2 py-2.5 text-sm font-semibold text-steel hover:text-ink">
                 See the policy
               </Link>
             ) : (
@@ -208,7 +218,15 @@ export default function LockScreens({
           </div>
           <Footer>
             <Secondary onClick={() => go("record")}>Back</Secondary>
-            {isPolicy ? <StartButton label="Start the demo" /> : <Primary onClick={() => go("build")}>Next: build from it</Primary>}
+            {isPolicy ? (
+              product ? (
+                !supersededBy && canPropose ? <StartButton parentLockId={block.lockId} label="Propose a new version" /> : <span />
+              ) : (
+                <StartButton label="Start the demo" />
+              )
+            ) : (
+              <Primary onClick={() => go("build")}>Next: build from it</Primary>
+            )}
           </Footer>
         </Panel>
       ) : null}
@@ -224,7 +242,7 @@ export default function LockScreens({
           </div>
 
           <div className="mt-10 border-t border-ink/10 pt-8">
-            {!supersededBy ? (
+            {!supersededBy && canPropose ? (
               <>
                 <h2 className="text-lg font-semibold">Need to change something?</h2>
                 <p className="mt-1 max-w-[60ch] text-[15px] leading-relaxed text-ink/70">
@@ -236,12 +254,14 @@ export default function LockScreens({
                 </div>
               </>
             ) : null}
-            <p className="mt-8 text-[15px] text-ink/70">
-              That&apos;s Knowledge Lock.{" "}
-              <a href={`${SITE_URL}/#get-started`} className="font-semibold text-accent hover:underline">
-                Talk to us about a pilot
-              </a>
-            </p>
+            {!product ? (
+              <p className="mt-8 text-[15px] text-ink/70">
+                That&apos;s Knowledge Lock.{" "}
+                <a href={`${SITE_URL}/#get-started`} className="font-semibold text-accent hover:underline">
+                  Talk to us about a pilot
+                </a>
+              </p>
+            ) : null}
           </div>
           <Footer>
             <Secondary onClick={() => go("verify")}>Back</Secondary>

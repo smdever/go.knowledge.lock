@@ -27,7 +27,7 @@ export function sql(): postgres.Sql {
  * Creates tables on first use. The locks and supersessions tables are append-only:
  * a trigger rejects any UPDATE or DELETE, so a stored lock cannot be changed in place.
  */
-async function ensureSchema(): Promise<void> {
+export async function ensureSchema(): Promise<void> {
   if (!g.__klSchema) {
     const db = sql();
     g.__klSchema = (async () => {

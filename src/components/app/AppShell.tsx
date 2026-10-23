@@ -5,13 +5,13 @@ import type { AppContext } from "@/lib/app/context";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://guidedorchestration.com";
 
-export function Brand() {
+export function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <span className="flex items-center gap-2 font-bold tracking-tight">
       <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-white">
         <Lock className="h-3.5 w-3.5" />
       </span>
-      <span>Knowledge Lock</span>
+      <span className={compact ? "hidden md:inline" : ""}>Knowledge Lock</span>
     </span>
   );
 }
@@ -48,7 +48,12 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
 export default function AppShell({ ctx, children }: { ctx: AppContext; children: React.ReactNode }) {
   const nav = [
     { href: "/app", label: "Home" },
-    ...(ctx.current ? [{ href: "/app/team", label: "Team" }] : []),
+    ...(ctx.current
+      ? [
+          { href: "/app/policies", label: "Policy" },
+          { href: "/app/team", label: "Team" },
+        ]
+      : []),
     { href: "/app/profile", label: "Profile" },
     ...(ctx.admin ? [{ href: "/app/admin", label: "Admin" }] : []),
   ];
@@ -57,8 +62,8 @@ export default function AppShell({ ctx, children }: { ctx: AppContext; children:
       <header className="sticky top-0 z-40 border-b border-ink/10 bg-bg/85 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-4">
-            <Link href="/app">
-              <Brand />
+            <Link href="/app" aria-label="Knowledge Lock home">
+              <Brand compact />
             </Link>
             {ctx.memberships.length > 1 ? (
               <form action={switchOrg} className="hidden sm:block">
@@ -80,7 +85,7 @@ export default function AppShell({ ctx, children }: { ctx: AppContext; children:
             ) : null}
           </div>
           <div className="flex items-center gap-4 text-sm">
-            <nav className="flex items-center gap-4">
+            <nav className="flex items-center gap-3 sm:gap-4">
               {nav.map((n) => (
                 <Link key={n.href} href={n.href} className="text-ink/70 hover:text-ink">{n.label}</Link>
               ))}

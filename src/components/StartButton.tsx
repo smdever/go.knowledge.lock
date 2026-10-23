@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Loader2 } from "lucide-react";
-import { api } from "@/lib/demo/client";
+import { useKL } from "./KLContext";
 
 export default function StartButton({ parentLockId, label = "Start the demo" }: { parentLockId?: string; label?: string }) {
   const router = useRouter();
+  const { api, recordPath } = useKL();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -15,7 +16,7 @@ export default function StartButton({ parentLockId, label = "Start the demo" }: 
     setError("");
     try {
       const view = await api.createRecord(parentLockId);
-      router.push(`/r/${view.record.id}`);
+      router.push(recordPath(view.record.id));
     } catch (err) {
       setError((err as Error).message);
       setBusy(false);

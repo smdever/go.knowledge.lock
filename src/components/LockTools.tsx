@@ -4,7 +4,8 @@ import { useState } from "react";
 import { AlertTriangle, Check, Download, Loader2, MessageSquare, SearchCheck, ShieldAlert, ShieldCheck } from "lucide-react";
 import { motion } from "motion/react";
 import { computeCanonicalPayloadHash, verifyKnowledgeLock, type KnowledgeLockBlock, type VerificationResult } from "@/lib/protocol";
-import { api } from "@/lib/demo/client";
+import type { Api } from "@/lib/demo/client";
+import { useKL } from "./KLContext";
 import { Card, Pill, shortHash } from "./Shell";
 
 function tamperedCopy(block: KnowledgeLockBlock): { copy: KnowledgeLockBlock; before: string; after: string; id: string } {
@@ -144,11 +145,12 @@ function Row({ ok, label, failLabel, small }: { ok: boolean; label: string; fail
 }
 
 export function Build({ lockId, questions, sampleTicket }: { lockId: string; questions: string[]; sampleTicket: string }) {
+  const { api } = useKL();
   const [tab, setTab] = useState<"ask" | "drift">("ask");
-  const [question, setQuestion] = useState(questions[0]);
-  const [answer, setAnswer] = useState<Awaited<ReturnType<typeof api.ask>> | null>(null);
+  const [question, setQuestion] = useState(questions[0] ?? "");
+  const [answer, setAnswer] = useState<Awaited<ReturnType<Api["ask"]>> | null>(null);
   const [ticket, setTicket] = useState(sampleTicket);
-  const [drift, setDrift] = useState<Awaited<ReturnType<typeof api.drift>> | null>(null);
+  const [drift, setDrift] = useState<Awaited<ReturnType<Api["drift"]>> | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -205,6 +207,7 @@ export function Build({ lockId, questions, sampleTicket }: { lockId: string; que
               onChange={(e) => setQuestion(e.target.value)}
               maxLength={400}
               aria-label="Question for the agent"
+              placeholder="Ask what this record says about something"
               className="w-full rounded-lg border border-ink/15 bg-bg/70 px-3 py-2 text-sm outline-none focus:border-accent"
             />
             <button type="button" onClick={ask} disabled={busy || !question.trim()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
@@ -237,6 +240,7 @@ export function Build({ lockId, questions, sampleTicket }: { lockId: string; que
           <textarea
             id="ticket"
             value={ticket}
+            placeholder="Paste a ticket, user story or spec to check against this record"
             onChange={(e) => setTicket(e.target.value)}
             rows={8}
             maxLength={4000}

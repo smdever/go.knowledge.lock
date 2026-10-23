@@ -1,4 +1,4 @@
-import { databaseUrl, sql } from "@/lib/demo/store/postgres";
+import { databaseUrl, ensureSchema, sql } from "@/lib/demo/store/postgres";
 
 const g = globalThis as unknown as { __klAppSchema?: Promise<void> };
 
@@ -8,6 +8,8 @@ export async function appDb() {
   if (!g.__klAppSchema) {
     const db = sql();
     g.__klAppSchema = (async () => {
+      // Locks, supersessions and usage counters use the same append-only tables as the demo.
+      await ensureSchema();
       await db`
         CREATE TABLE IF NOT EXISTS kl_organisations (
           id text PRIMARY KEY,
@@ -56,10 +58,23 @@ export async function appDb() {
           detail jsonb,
           at timestamptz NOT NULL DEFAULT now()
         )`;
+      await db`
+        CREATE TABLE IF NOT EXISTS kl_app_records (
+          id text PRIMARY KEY,
+          org_id text NOT NULL REFERENCES kl_organisations(id),
+          kind text NOT NULL CHECK (kind IN ('requirements', 'policy')),
+          status text NOT NULL CHECK (status IN ('draft', 'locked')),
+          created_by text NOT NULL,
+          lock_id text,
+          data jsonb NOT NULL,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          updated_at timestamptz NOT NULL DEFAULT now()
+        )`;
+      await db`CREATE INDEX IF NOT EXISTS kl_app_records_org ON kl_app_records (org_id, updated_at DESC)`;
       await db`CREATE INDEX IF NOT EXISTS kl_members_user ON kl_members (user_id)`;
       await db`CREATE INDEX IF NOT EXISTS kl_invites_org ON kl_invites (org_id)`;
       await db`CREATE INDEX IF NOT EXISTS kl_audit_org ON kl_audit (org_id, at)`;
-      for (const table of ["kl_organisations", "kl_profiles", "kl_members", "kl_invites", "kl_audit"]) {
+      for (const table of ["kl_organisations", "kl_profiles", "kl_members", "kl_invites", "kl_audit", "kl_app_records"]) {
         await db.unsafe(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`);
       }
       // The audit log is append-only, like locks.

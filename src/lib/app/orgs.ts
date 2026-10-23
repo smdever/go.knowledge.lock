@@ -29,7 +29,7 @@ export function checkEmail(raw: unknown): string {
   return email;
 }
 
-async function audit(orgId: string | null, actor: AppUser | null, action: string, target?: string, detail?: object) {
+export async function audit(orgId: string | null, actor: AppUser | null, action: string, target?: string, detail?: object) {
   const db = await appDb();
   await db`INSERT INTO kl_audit (org_id, actor_id, actor_email, action, target, detail)
            VALUES (${orgId}, ${actor?.id ?? null}, ${actor?.email ?? null}, ${action}, ${target ?? null}, ${detail ? db.json(detail as never) : null})`;

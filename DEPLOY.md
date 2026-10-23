@@ -77,9 +77,16 @@ Create a second project from this repo (e.g. `knowledge-lock-app`) and add the d
 | `KL_AUTHORITY_PRIVATE_KEY`, `KL_AUTHORITY_PUBLIC_KEY` | A new pair for the product: `node scripts/generate-authority-key.mjs` |
 | `NEXT_PUBLIC_SITE_URL` | `https://guidedorchestration.com` |
 | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` | Needed from phase 2 (model review) |
+| `KL_ORG_HOURLY_LIMIT` | Optional. AI calls per organisation per hour (default 300) |
 
 ### 3. First sign-in
 Go to app.knowledge-lock.com, sign in with your admin email, open **Admin** and create an organisation for each design partner. Its owner gets an invite and invites the rest of their team from **Team**. Only people with an account, a pending invite or admin rights are sent sign-in links.
+
+### How records work in the product
+- An owner proposes the organisation's **Policy** first (optional but recommended). Every later record is reviewed against it.
+- Anyone who is an owner or signer creates a **New record**: a title, one statement per line, the people who must sign it, and how many of them must approve (the quorum).
+- The AI models review it; objections are fixed in place. Each chosen signer then approves or asks for changes from their own account. Any open objection blocks the lock.
+- Once the quorum is met, any owner or signer locks it. A change to a locked record becomes the next version, with the same signers.
 
 ### Running the product locally
 In `.env.local`: `KL_MODE=app`, `KL_DEV_AUTH=1` (sign in as any email without Supabase; never active on Vercel), `KL_ADMIN_EMAILS=you@example.com` and a local `DATABASE_URL`. Invite links are printed in the terminal when Resend isn't set up.

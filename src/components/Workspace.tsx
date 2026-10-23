@@ -7,8 +7,8 @@ import { AlertTriangle, Check, ChevronDown, Loader2, Lock, Plus, Sparkles, Trash
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import Avatar from "./Avatar";
 import type { KnowledgeClaim } from "@/lib/protocol";
-import { api } from "@/lib/demo/client";
-import type { FixSuggestion, ProviderId, RecordView, ReviewIssue, Stakeholder } from "@/lib/demo/types";
+import type { FixSuggestion, ProviderId, RecordView, ReviewIssue, SignerView } from "@/lib/demo/types";
+import { useKL } from "./KLContext";
 
 const PROVIDER_LABEL: Record<ProviderId, string> = { anthropic: "Anthropic", openai: "OpenAI", google: "Google" };
 
@@ -35,6 +35,9 @@ const listNames = (names: string[]) =>
 
 export default function Workspace({ initial, policy }: { initial: RecordView; policy: KnowledgeClaim[] }) {
   const router = useRouter();
+  const kl = useKL();
+  const api = kl.api;
+  const product = kl.mode === "app";
   const [view, setView] = useState(initial);
   const [items, setItems] = useState(initial.record.payload.claims.map((c) => c.statement));
   const [busy, setBusy] = useState<"" | "saving" | "reviewing" | "locking">("");
@@ -46,7 +49,16 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
   const [error, setError] = useState("");
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
 
-  const { record, evaluation, stakeholders, providers } = view;
+  const { record, evaluation, providers } = view;
+  // The demo's three stakeholders can all be signed for by whoever is watching; product signers only by themselves.
+  const signers: SignerView[] =
+    view.signers ??
+    view.stakeholders.map((s) => ({ key: s.role, name: s.name, title: s.title, avatarRole: s.role, canSign: true }));
+  const quorum = view.quorum ?? signers.length;
+  const canEdit = view.canEdit ?? true;
+  const prefix = view.claimPrefix ?? "R";
+  const maxClaims = view.maxClaims ?? 12;
+  const isPolicyRecord = view.kind === "policy";
   const savedItems = record.payload.claims.map((c) => c.statement);
   const dirty = items.join("\u0000") !== savedItems.join("\u0000");
 
@@ -82,10 +94,11 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
   const m = evaluation.metrics;
   const modelsPass =
     okReviews.length > 0 && m.distinctModelCount >= 2 && m.distinctProviderCount >= 2 && m.modelRejections === 0;
-  const signedRoles = new Set(
-    record.attestations.filter((a) => a.attestorType === "human" && a.decision === "APPROVE").map((a) => a.role)
-  );
-  const allSigned = stakeholders.every((s) => signedRoles.has(s.role));
+  const humans = record.attestations.filter((a) => a.attestorType === "human" && a.subjectHash === record.payloadHash);
+  const signedRoles = new Set(humans.filter((a) => a.decision === "APPROVE").map((a) => a.role));
+  const objectors = humans.filter((a) => a.decision === "REJECT").length;
+  const approvals = signers.filter((s) => signedRoles.has(s.key)).length;
+  const allSigned = approvals >= quorum && objectors === 0;
   const resolvedCount = record.resolutions?.length ?? 0;
 
   const [screen, setScreen] = useState<Screen>(() =>
@@ -104,8 +117,23 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
   };
 
   useEffect(() => {
-    if (record.status === "locked" && record.lockId) router.replace(`/l/${record.lockId}`);
-  }, [record.status, record.lockId, router]);
+    if (record.status === "locked" && record.lockId) router.replace(kl.lockPath(record.lockId));
+  }, [record.status, record.lockId, router, kl]);
+
+  // In the product, colleagues sign from their own accounts, so keep the sign-off and lock screens current.
+  const live = product && (screen === "signoff" || screen === "lock") && !busy && Object.keys(pending).length === 0;
+  useEffect(() => {
+    if (!live) return;
+    const timer = window.setInterval(async () => {
+      try {
+        const next = await api.getRecord(record.id);
+        setView(next);
+      } catch {
+        // try again on the next tick
+      }
+    }, 8000);
+    return () => window.clearInterval(timer);
+  }, [live, api, record.id]);
 
   useEffect(() => {
     if (screen !== "propose" || focusIndex === null) return;
@@ -197,14 +225,14 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
   }
 
   function signAll() {
-    for (const s of stakeholders) {
-      if (!signedRoles.has(s.role) && !pending[s.role]) void sign(s.role, "APPROVE");
+    for (const s of signers) {
+      if (s.canSign && !signedRoles.has(s.key) && !pending[s.key]) void sign(s.key, "APPROVE");
     }
   }
 
   async function lock() {
     const res = await attempt(() => api.lock(record.id), "locking");
-    if (res) router.push(`/l/${res.lockId}?new=1`);
+    if (res) router.push(`${kl.lockPath(res.lockId)}?new=1`);
   }
 
   const reviewing = busy === "reviewing" || busy === "saving";
@@ -218,7 +246,7 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
           {record.version > 1 ? (
             <>
               Draft v{record.version}, changing{" "}
-              <Link href={`/l/${record.parentLockId}`} className="underline hover:text-ink">
+              <Link href={kl.lockPath(record.parentLockId ?? "")} className="underline hover:text-ink">
                 locked v{record.version - 1}
               </Link>
             </>
@@ -245,54 +273,80 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
       {screen === "propose" ? (
         <Screen key="propose">
           <Heading
-            title={record.version > 1 ? "Make your change" : "One of these requirements breaks the bank's policy"}
+            title={
+              record.version > 1
+                ? "Make your change"
+                : product
+                  ? isPolicyRecord
+                    ? "Your policy, ready for review"
+                    : "Your draft, ready for review"
+                  : "One of these requirements breaks the bank's policy"
+            }
             text={
               record.version > 1
-                ? "Edit the requirements, then send them for review. Everything is checked again from scratch."
-                : "Halden Bank's teams drafted these for an AI complaints assistant. Send them for review and see whether the AI reviewers catch it."
+                ? "Edit the wording, then send it for review. Everything is checked again from scratch."
+                : product
+                  ? isPolicyRecord
+                    ? "Edit the rules if you need to. The AI reviewers check them for contradictions and unclear wording."
+                    : policy.length
+                      ? "Edit the wording if you need to, then send it for review. The AI reviewers check every line against your locked policy."
+                      : "Edit the wording if you need to, then send it for review. There's no locked policy yet, so the reviewers check for contradictions and unclear wording."
+                  : "Halden Bank's teams drafted these for an AI complaints assistant. Send them for review and see whether the AI reviewers catch it."
             }
           />
           <ol className="mt-6 divide-y divide-ink/10 border-y border-ink/10">
             {items.map((statement, i) => (
               <li key={i} className="group flex items-start gap-3 py-3">
-                <span className="w-7 shrink-0 pt-2 text-sm font-semibold text-steel">R{i + 1}</span>
+                <span className="w-7 shrink-0 pt-2 text-sm font-semibold text-steel">
+                  {prefix}
+                  {i + 1}
+                </span>
                 <textarea
                   id={`req-${i}`}
-                  aria-label={`Requirement R${i + 1}`}
+                  aria-label={`${isPolicyRecord ? "Rule" : "Requirement"} ${prefix}${i + 1}`}
                   value={statement}
+                  readOnly={!canEdit}
                   onChange={(e) => setItems(items.map((s, j) => (j === i ? e.target.value : s)))}
                   rows={Math.max(2, Math.ceil(statement.length / 70))}
                   maxLength={600}
                   className="field-sizing-content w-full resize-none rounded-md border border-transparent bg-transparent px-2 py-1.5 text-[15px] leading-relaxed outline-none hover:border-ink/10 focus:border-accent/60 focus:bg-white/40"
                 />
+                {canEdit ? (
                 <button
                   type="button"
-                  aria-label={`Remove R${i + 1}`}
+                  aria-label={`Remove ${prefix}${i + 1}`}
                   onClick={() => setItems(items.filter((_, j) => j !== i))}
                   className="mt-1.5 rounded-md p-1.5 text-muted opacity-60 hover:bg-ink/5 hover:text-bad group-hover:opacity-100 focus-visible:opacity-100"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
+                ) : null}
               </li>
             ))}
           </ol>
-          <button
-            type="button"
-            onClick={() => setItems([...items, ""])}
-            disabled={items.length >= 12}
-            className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-steel hover:text-ink disabled:opacity-50"
-          >
-            <Plus className="h-4 w-4" /> Add a requirement
-          </button>
+          {canEdit ? (
+            <button
+              type="button"
+              onClick={() => setItems([...items, ""])}
+              disabled={items.length >= maxClaims}
+              className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-steel hover:text-ink disabled:opacity-50"
+            >
+              <Plus className="h-4 w-4" /> {isPolicyRecord ? "Add a rule" : "Add a requirement"}
+            </button>
+          ) : (
+            <p className="mt-3 text-sm text-muted">You can read this draft. Owners and signers can change it.</p>
+          )}
 
-          <PolicyDrawer policy={policy} />
+          {policy.length ? <PolicyDrawer policy={policy} /> : null}
 
           <Footer>
             <span />
             {!dirty && reviews.length ? (
               <PrimaryButton onClick={() => go("review")}>See the review</PrimaryButton>
-            ) : (
+            ) : canEdit ? (
               <PrimaryButton onClick={() => sendForReview()}>Send for review</PrimaryButton>
+            ) : (
+              <span />
             )}
           </Footer>
         </Screen>
@@ -304,14 +358,18 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
           {reviewing ? (
             <Heading
               title={resolvedCount ? "The reviewers are checking the new wording" : "Three AI reviewers are reading the draft"}
-              text="Each one checks every requirement against the locked policy, independently of the others. This takes a few seconds."
+              text={
+                product && !policy.length
+                  ? "Each one reads every line independently of the others, looking for contradictions and unclear wording. This takes a few seconds."
+                  : "Each one checks every requirement against the locked policy, independently of the others. This takes a few seconds."
+              }
             />
           ) : objections.length ? (
             <Heading
               title={
                 objections.length === 1
-                  ? `Blocked: ${objections[0].claim.id} conflicts with the bank's policy`
-                  : `Blocked: ${objections.length} requirements conflict with the bank's policy`
+                  ? `Blocked: ${objections[0].claim.id} ${product ? "has a problem the reviewers won't pass" : "conflicts with the bank's policy"}`
+                  : `Blocked: ${objections.length} ${product ? "lines have problems the reviewers won't pass" : "requirements conflict with the bank's policy"}`
               }
               text="Nothing can be locked while an AI reviewer objects. Fix it here and it goes straight back for review."
             />
@@ -321,7 +379,9 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
               text={
                 resolvedCount
                   ? "The fix worked. How the objection was resolved will be recorded in the lock. Next, the people sign off."
-                  : "No conflicts with the locked policy. Next, the people sign off."
+                  : product && !policy.length
+                    ? "No contradictions or blocking problems found. Next, the people sign off."
+                    : "No conflicts with the locked policy. Next, the people sign off."
               }
             />
           ) : (
@@ -340,7 +400,7 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
                   policy={policy}
                   suggestion={suggestion?.requirementId === o.claim.id ? suggestion : null}
                   suggesting={suggesting === o.claim.id}
-                  disabled={Boolean(busy) || Boolean(suggesting)}
+                  disabled={Boolean(busy) || Boolean(suggesting) || !canEdit}
                   onSuggest={() => askForFix(o)}
                   onAccept={() => {
                     if (!suggestion) return;
@@ -411,7 +471,7 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
               </PrimaryButton>
             ) : modelsPass ? (
               <PrimaryButton onClick={() => go("signoff")}>Next: sign off</PrimaryButton>
-            ) : !objections.length || failedReviews.length ? (
+            ) : canEdit && (!objections.length || failedReviews.length) ? (
               <PrimaryButton onClick={() => sendForReview()}>Review again</PrimaryButton>
             ) : (
               <span />
@@ -424,25 +484,37 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
       {screen === "signoff" ? (
         <Screen key="signoff">
           <Heading
-            title={allSigned ? "Everyone has signed off" : "Now the people sign off"}
-            text="Each person approves this exact wording. In a pilot they'd each sign in from their own account; here you can act for all three."
+            title={
+              allSigned
+                ? product && approvals < signers.length
+                  ? "Enough people have signed off"
+                  : "Everyone has signed off"
+                : objectors
+                  ? "Someone has asked for changes"
+                  : "Now the people sign off"
+            }
+            text={
+              product
+                ? `${quorum === signers.length ? "Everyone listed" : `${quorum} of the ${signers.length} people listed`} must approve this exact wording. An objection from anyone blocks the lock until they withdraw it or the wording changes. You can only sign for yourself.`
+                : "Each person approves this exact wording. In a pilot they'd each sign in from their own account; here you can act for all three."
+            }
           />
           <ul className="mt-6 divide-y divide-ink/10 border-y border-ink/10">
-            {stakeholders.map((s) => (
+            {signers.map((s) => (
               <SignerRow
-                key={s.role}
-                stakeholder={s}
-                attestation={record.attestations.find((a) => a.attestorType === "human" && a.role === s.role)}
-                pending={pending[s.role]}
-                onSign={(decision, comment) => sign(s.role, decision, comment)}
+                key={s.key}
+                signer={s}
+                attestation={humans.find((a) => a.role === s.key)}
+                pending={pending[s.key]}
+                onSign={(decision, comment) => sign(s.key, decision, comment)}
               />
             ))}
           </ul>
-          {!allSigned ? (
+          {!product && !allSigned ? (
             <button
               type="button"
               onClick={signAll}
-              disabled={stakeholders.every((s) => signedRoles.has(s.role) || pending[s.role])}
+              disabled={signers.every((s) => signedRoles.has(s.key) || pending[s.key])}
               className="mt-3 text-sm font-semibold text-steel hover:text-ink disabled:opacity-50"
             >
               Sign off for all three
@@ -469,7 +541,9 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
               {m.modelApprovals} of {configured.length} AI reviewers approve, with no objections
             </Done>
             <Done ok={allSigned}>
-              {signedRoles.size} of {stakeholders.length} people have signed off
+              {product
+                ? `${approvals} of ${quorum} required approvals${objectors ? `, and ${objectors} objection${objectors === 1 ? "" : "s"} to resolve` : ""}`
+                : `${signedRoles.size} of ${signers.length} people have signed off`}
             </Done>
             {resolvedCount ? (
               <Done ok>
@@ -884,12 +958,12 @@ function ObjectionCard({
 }
 
 function SignerRow({
-  stakeholder,
+  signer,
   attestation,
   pending,
   onSign,
 }: {
-  stakeholder: Stakeholder;
+  signer: SignerView;
   attestation?: { decision: string; reasoning?: string };
   pending?: "APPROVE" | "REJECT";
   onSign: (decision: "APPROVE" | "REJECT", comment?: string) => Promise<boolean>;
@@ -903,10 +977,10 @@ function SignerRow({
     <li className="py-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Avatar name={stakeholder.name} role={stakeholder.role} signed={approved} />
+          <Avatar name={signer.name} role={signer.avatarRole} signed={approved} />
           <div>
-            <p className="font-semibold">{stakeholder.name}</p>
-            <p className="text-sm text-muted">{stakeholder.title}</p>
+            <p className="font-semibold">{signer.name}</p>
+            <p className="text-sm text-muted">{signer.title}</p>
           </div>
         </div>
         <AnimatePresence mode="wait" initial={false}>
@@ -920,6 +994,10 @@ function SignerRow({
             >
               <Check className="h-4 w-4" /> Signed off
             </motion.span>
+          ) : !signer.canSign ? (
+            <span key="waiting" className="ml-[52px] text-sm text-muted sm:ml-0">
+              {rejected ? "Asked for changes" : "Waiting for them"}
+            </span>
           ) : !asking ? (
             <motion.div
               key="actions"
@@ -961,7 +1039,7 @@ function SignerRow({
             onChange={(e) => setComment(e.target.value)}
             maxLength={400}
             placeholder="What needs to change?"
-            aria-label={`What ${stakeholder.name} wants changed`}
+            aria-label={`What ${signer.name} wants changed`}
             className="w-full rounded-lg border border-ink/15 bg-white/40 px-3 py-2 text-sm outline-none focus:border-accent"
           />
           <div className="flex shrink-0 gap-2">

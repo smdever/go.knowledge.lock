@@ -12,31 +12,32 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return data as T;
 }
 
-export const api = {
+/** The same calls against the demo (`/api`) or the product (`/api/app`). */
+export const makeApi = (base: string) => ({
   createRecord: (parentLockId?: string) =>
-    request<RecordView>("/api/records", { method: "POST", body: JSON.stringify({ parentLockId }) }),
-  getRecord: (id: string) => request<RecordView>(`/api/records/${id}`),
+    request<RecordView>(`${base}/records`, { method: "POST", body: JSON.stringify({ parentLockId }) }),
+  getRecord: (id: string) => request<RecordView>(`${base}/records/${id}`),
   updateRecord: (
     id: string,
     title: string,
     requirements: string[],
     fix?: { requirementId: string; provider: ProviderId }
-  ) => request<RecordView>(`/api/records/${id}`, { method: "PATCH", body: JSON.stringify({ title, requirements, fix }) }),
+  ) => request<RecordView>(`${base}/records/${id}`, { method: "PATCH", body: JSON.stringify({ title, requirements, fix }) }),
   suggestFix: (id: string, requirementId: string, provider: ProviderId) =>
-    request<FixSuggestion>(`/api/records/${id}/suggest`, {
+    request<FixSuggestion>(`${base}/records/${id}/suggest`, {
       method: "POST",
       body: JSON.stringify({ requirementId, provider }),
     }),
-  review: (id: string) => request<RecordView>(`/api/records/${id}/review`, { method: "POST" }),
+  review: (id: string) => request<RecordView>(`${base}/records/${id}/review`, { method: "POST" }),
   signOff: (id: string, role: string, decision: "APPROVE" | "REJECT", comment?: string) =>
-    request<RecordView>(`/api/records/${id}/approve`, {
+    request<RecordView>(`${base}/records/${id}/approve`, {
       method: "POST",
       body: JSON.stringify({ role, decision, comment }),
     }),
-  lock: (id: string) => request<{ lockId: string }>(`/api/records/${id}/lock`, { method: "POST" }),
+  lock: (id: string) => request<{ lockId: string }>(`${base}/records/${id}/lock`, { method: "POST" }),
   ask: (lockId: string, question: string) =>
     request<{ answer: string; citations: string[]; covered: boolean; model: string; stub: boolean }>(
-      `/api/locks/${lockId}/ask`,
+      `${base}/locks/${lockId}/ask`,
       { method: "POST", body: JSON.stringify({ question }) }
     ),
   drift: (lockId: string, work: string) =>
@@ -45,5 +46,8 @@ export const api = {
       findings: { requirementId: string; kind: "departs" | "not_covered"; excerpt: string; detail: string }[];
       model: string;
       stub: boolean;
-    }>(`/api/locks/${lockId}/drift`, { method: "POST", body: JSON.stringify({ work }) }),
-};
+    }>(`${base}/locks/${lockId}/drift`, { method: "POST", body: JSON.stringify({ work }) }),
+});
+
+export type Api = ReturnType<typeof makeApi>;
+export const api = makeApi("/api");
