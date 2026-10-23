@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const PRODUCT_ROUTES = [/^\/app(\/|$)/, /^\/api\/app\//, /^\/signin(\/|$)/, /^\/auth\//, /^\/invite\//];
+const PRODUCT_ROUTES = [/^\/app(\/|$)/, /^\/api\/app\//, /^\/api\/v1\//, /^\/signin(\/|$)/, /^\/auth\//, /^\/invite\//];
 const DEMO_ROUTES = [/^\/r\//, /^\/l\//, /^\/api\/records/, /^\/api\/locks/];
 
 const notFound = (request: NextRequest) => NextResponse.rewrite(new URL("/_kl-not-found", request.url));
@@ -27,6 +27,8 @@ export async function proxy(request: NextRequest) {
     }
   }
   if (path === "/") return NextResponse.redirect(new URL("/app", request.url));
+  // The public API uses API keys, not sign-in cookies.
+  if (path.startsWith("/api/v1/")) return NextResponse.next();
 
   const env = process.env;
   const url = env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL;

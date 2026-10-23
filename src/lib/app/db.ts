@@ -1,7 +1,7 @@
 import { databaseUrl, ensureSchema, markSchema, schemaIsCurrent, sql } from "@/lib/demo/store/postgres";
 
 /** Bump when the statements below change (see schemaIsCurrent). */
-const APP_SCHEMA_VERSION = 1;
+const APP_SCHEMA_VERSION = 2;
 
 const g = globalThis as unknown as { __klAppSchema?: Promise<void> };
 
@@ -75,10 +75,22 @@ export async function appDb() {
           updated_at timestamptz NOT NULL DEFAULT now()
         )`;
       await db`CREATE INDEX IF NOT EXISTS kl_app_records_org ON kl_app_records (org_id, updated_at DESC)`;
+      await db`
+        CREATE TABLE IF NOT EXISTS kl_api_keys (
+          id text PRIMARY KEY,
+          org_id text NOT NULL REFERENCES kl_organisations(id),
+          name text NOT NULL,
+          prefix text NOT NULL,
+          key_hash text NOT NULL UNIQUE,
+          created_by text NOT NULL,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          last_used_at timestamptz,
+          revoked_at timestamptz
+        )`;
       await db`CREATE INDEX IF NOT EXISTS kl_members_user ON kl_members (user_id)`;
       await db`CREATE INDEX IF NOT EXISTS kl_invites_org ON kl_invites (org_id)`;
       await db`CREATE INDEX IF NOT EXISTS kl_audit_org ON kl_audit (org_id, at)`;
-      for (const table of ["kl_organisations", "kl_profiles", "kl_members", "kl_invites", "kl_audit", "kl_app_records"]) {
+      for (const table of ["kl_organisations", "kl_profiles", "kl_members", "kl_invites", "kl_audit", "kl_app_records", "kl_api_keys"]) {
         await db.unsafe(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`);
       }
       // The audit log is append-only, like locks.

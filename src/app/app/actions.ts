@@ -7,6 +7,7 @@ import { appUrl } from "@/lib/mode";
 import { DEV_COOKIE, devAuthEnabled, devSessionValue, getUser, safeNext, supabaseConfig, supabaseServer } from "@/lib/app/auth";
 import { getContext, ORG_COOKIE } from "@/lib/app/context";
 import { inviteEmail, sendEmail } from "@/lib/app/email";
+import { createApiKey, revokeApiKey } from "@/lib/app/apikeys";
 import {
   acceptInvite,
   AppError,
@@ -173,6 +174,23 @@ export async function removeMemberAction(_prev: FormState, fd: FormData): Promis
     revalidatePath("/app/team");
     return { message: "Removed." };
   });
+}
+
+// ---------- API keys ----------
+
+export async function createApiKeyAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  return attempt(async () => {
+    const { user, org } = await currentOrg();
+    const { key, name } = await createApiKey(org.orgId, user, str(fd, "name"));
+    revalidatePath("/app/api-keys");
+    return { message: `Key "${name}" created. Copy it now: you won't be able to see it again.`, link: key };
+  });
+}
+
+export async function revokeApiKeyAction(fd: FormData) {
+  const { user, org } = await currentOrg();
+  await revokeApiKey(org.orgId, user, str(fd, "keyId"));
+  revalidatePath("/app/api-keys");
 }
 
 // ---------- Admin ----------

@@ -57,6 +57,12 @@ export async function listActivity(orgId: string, limit = 200): Promise<Activity
         return { ...base, text: `changed ${r.target}'s role from ${roleName(d.from)} to ${roleName(d.to)}` };
       case "member.removed":
         return { ...base, text: `removed ${r.target}` };
+      case "api_key.created":
+        return { ...base, text: `created the API key "${r.target}"` };
+      case "api_key.revoked":
+        return { ...base, text: `revoked the API key "${r.target}"` };
+      case "api.export":
+        return { ...base, actor: `API key "${String(d.key ?? "")}"`, text: "exported all locked records" };
       case "record.created":
         return { ...base, text: `created ${record}${v}`, href: recordHref };
       case "record.reviewed":

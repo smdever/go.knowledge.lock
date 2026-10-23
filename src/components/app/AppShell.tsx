@@ -60,7 +60,12 @@ export default function AppShell({ ctx, children }: { ctx: AppContext; children:
       ? [
           { href: "/app/policies", label: "Policy" },
           { href: "/app/team", label: "Team" },
-          ...(ctx.current.role === "owner" ? [{ href: "/app/activity", label: "Activity", more: true }] : []),
+          ...(ctx.current.role === "owner"
+            ? [
+                { href: "/app/activity", label: "Activity", more: true },
+                { href: "/app/api-keys", label: "API", more: true },
+              ]
+            : []),
         ]
       : []),
     { href: "/app/guide", label: "Guide", more: true },

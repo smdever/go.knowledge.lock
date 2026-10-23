@@ -121,7 +121,7 @@ function assertDraft(record: AppRecord) {
 }
 
 /** A lock that belongs to one of this organisation's records. */
-async function orgLock(orgId: string, lockId: string): Promise<{ block: KnowledgeLockBlock; recordId: string } | null> {
+export async function orgLock(orgId: string, lockId: string): Promise<{ block: KnowledgeLockBlock; recordId: string } | null> {
   const db = await appDb();
   const [row] = await db<{ block: KnowledgeLockBlock; recordId: string }[]>`
     SELECT l.block, l.record_id AS "recordId" FROM kl_locks l JOIN kl_app_records r ON r.id = l.record_id
@@ -609,9 +609,7 @@ export async function lockOrg(user: AppUser, lockId: string): Promise<string | n
   return row?.orgId ?? null;
 }
 
-async function usableLock(user: AppUser, lockId: string) {
-  const orgId = await lockOrg(user, lockId);
-  if (!orgId) throw new DemoError("Locked record not found.", 404);
+async function usableOrgLock(orgId: string, lockId: string) {
   const lock = await orgLock(orgId, lockId);
   if (!lock) throw new DemoError("Locked record not found.", 404);
   const check = await verifyKnowledgeLock(lock.block);
@@ -622,9 +620,16 @@ async function usableLock(user: AppUser, lockId: string) {
 }
 
 export async function askAgent(user: AppUser, lockId: string, question: unknown) {
+  const orgId = await lockOrg(user, lockId);
+  if (!orgId) throw new DemoError("Locked record not found.", 404);
+  return askOrgAgent(orgId, lockId, question);
+}
+
+/** Answers a question from one locked record (and the policy it was checked against) only. */
+export async function askOrgAgent(orgIdIn: string, lockId: string, question: unknown) {
   const q = typeof question === "string" ? question.trim().slice(0, MAX_QUESTION) : "";
   if (!q) throw new DemoError("Ask a question.");
-  const { orgId, org, block, policy } = await usableLock(user, lockId);
+  const { orgId, org, block, policy } = await usableOrgLock(orgIdIn, lockId);
   const provider = pickAgentProvider();
   await chargeOrg(orgId, 1);
   const raw = await callModelJson(provider, {
@@ -646,9 +651,16 @@ export async function askAgent(user: AppUser, lockId: string, question: unknown)
 }
 
 export async function checkDrift(user: AppUser, lockId: string, work: unknown) {
+  const orgId = await lockOrg(user, lockId);
+  if (!orgId) throw new DemoError("Locked record not found.", 404);
+  return checkOrgDrift(orgId, lockId, work);
+}
+
+/** Finds where a ticket, story or spec departs from a locked record. */
+export async function checkOrgDrift(orgIdIn: string, lockId: string, work: unknown) {
   const text = typeof work === "string" ? work.trim().slice(0, MAX_WORK_ITEM) : "";
   if (!text) throw new DemoError("Paste a ticket or spec to check.");
-  const { orgId, org, block, policy } = await usableLock(user, lockId);
+  const { orgId, org, block, policy } = await usableOrgLock(orgIdIn, lockId);
   const provider = pickAgentProvider();
   await chargeOrg(orgId, 1);
   const raw = await callModelJson(provider, {
@@ -668,6 +680,50 @@ export async function checkDrift(user: AppUser, lockId: string, work: unknown) {
     }))
     .slice(0, 12);
   return { summary: String(raw.summary ?? "").slice(0, 400), findings, model: provider.model, provider: provider.id, stub: !provider.apiKey };
+}
+
+// ---------- For the API ----------
+
+export interface LockSummary {
+  lockId: string;
+  recordId: string;
+  kind: RecordKind;
+  title: string;
+  version: number;
+  lockedAt: string;
+  supersededBy: string | null;
+  claims: { id: string; statement: string }[];
+}
+
+/** The organisation's locked records, newest first. Replaced versions are left out unless asked for. */
+export async function listOrgLocks(orgId: string, includeReplaced = false): Promise<LockSummary[]> {
+  const db = await appDb();
+  const rows = await db<{ block: KnowledgeLockBlock; recordId: string; kind: RecordKind; supersededBy: string | null }[]>`
+    SELECT l.block, l.record_id AS "recordId", r.kind, s.superseded_by AS "supersededBy"
+    FROM kl_locks l JOIN kl_app_records r ON r.id = l.record_id
+    LEFT JOIN kl_supersessions s ON s.lock_id = l.lock_id
+    WHERE r.org_id = ${orgId}
+    ORDER BY l.created_at DESC`;
+  return rows
+    .filter((r) => includeReplaced || !r.supersededBy)
+    .map((r) => ({
+      lockId: r.block.lockId,
+      recordId: r.recordId,
+      kind: r.kind,
+      title: r.block.payload.title,
+      version: Number(r.block.payload.metadata?.version ?? 1),
+      lockedAt: new Date(r.block.lockedAt).toISOString(),
+      supersededBy: r.supersededBy,
+      claims: r.block.payload.claims.map((c) => ({ id: c.id, statement: c.statement })),
+    }));
+}
+
+export async function orgPolicyLockId(orgId: string): Promise<string | null> {
+  return (await getOrg(orgId)).policyLockId;
+}
+
+export async function orgName(orgId: string): Promise<string> {
+  return (await getOrg(orgId)).name;
 }
 
 export { AppError };

@@ -201,3 +201,17 @@ export function CreateOrgForm({ action }: { action: Action }) {
     </form>
   );
 }
+
+export function ApiKeyForm({ action }: { action: Action }) {
+  const [state, formAction] = useActionState(action, {});
+  return (
+    <form action={formAction}>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <label htmlFor="key-name" className="sr-only">Key name</label>
+        <input id="key-name" name="name" required maxLength={60} placeholder="e.g. Delivery agent, Jira sync" className={`${inputClass} sm:flex-1`} />
+        <Submit>Create key</Submit>
+      </div>
+      <Result state={state} />
+    </form>
+  );
+}

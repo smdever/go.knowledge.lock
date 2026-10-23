@@ -78,10 +78,14 @@ Create a second project from this repo (e.g. `knowledge-lock-app`) and add the d
 | `NEXT_PUBLIC_SITE_URL` | `https://guidedorchestration.com` |
 | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` | Needed from phase 2 (model review) |
 | `KL_ORG_HOURLY_LIMIT` | Optional. AI calls per organisation per hour (default 300) |
+| `KL_API_HOURLY_LIMIT`, `KL_API_DAILY_LIMIT` | Optional. Agent API requests per key per hour (default 1000) and per organisation per day (default 10000) |
 | `KL_SUPPORT_EMAIL` | Optional. The help address shown in the in-app guide (default `hello@guidedorchestration.com`) |
 
 ### 3. First sign-in
 Go to app.knowledge-lock.com, sign in with your admin email, open **Admin** and create an organisation for each design partner. Its owner gets an invite and invites the rest of their team from **Team**. Only people with an account, a pending invite or admin rights are sent sign-in links.
+
+### Agent API
+Owners create API keys under **API** (`/app/api-keys`). Agents call `https://app.knowledge-lock.com/api/v1/…` with `Authorization: Bearer kl_live_…`. The API is read-only: list and fetch locks, the policy, ask, check and export. Keys are stored as hashes; the full key is shown once. Docs: guidedorchestration.com/docs/knowledge-lock-api. The demo site returns 404 for `/api/v1`.
 
 ### How records work in the product
 - An owner proposes the organisation's **Policy** first (optional but recommended). Every later record is reviewed against it.

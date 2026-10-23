@@ -23,6 +23,7 @@ const SECTIONS = [
   ["ai", "What the AI reviewers do"],
   ["change", "Changing a locked record"],
   ["use", "Using a locked record"],
+  ["api", "Connecting your own AI agents"],
   ["emails", "Emails you'll get"],
   ["data", "Your data"],
   ["help", "Getting help"],
@@ -146,6 +147,17 @@ export default async function GuidePage() {
           <strong>Check a ticket.</strong> Paste a ticket, user story or spec to see where it departs from what was agreed.
         </li>
       </ul>
+
+      <H2 id="api">Connecting your own AI agents</H2>
+      <P>
+        Owners can create API keys under <strong>API</strong>. Your own systems and AI agents can then read your locked records,
+        check they haven&apos;t changed, ask questions of them and check work against them. The API can&apos;t change or sign
+        anything. See the{" "}
+        <a href={`${SITE_URL}/docs/knowledge-lock-api`} className="text-steel underline hover:text-ink">
+          API documentation
+        </a>
+        .
+      </P>
 
       <H2 id="emails">Emails you&apos;ll get</H2>
       <ul className="mt-3 list-disc space-y-2 pl-5 text-[15px] leading-relaxed text-ink/80">
