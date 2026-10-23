@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { FilePenLine, Hammer, Lock, Users } from "lucide-react";
-import Shell, { Card } from "@/components/Shell";
+import Shell, { APP_URL, Card } from "@/components/Shell";
 import StartButton from "@/components/StartButton";
 import { ensurePolicyLock } from "@/lib/demo/service";
 import { DRAFT_TITLE, ORG_NAME, POLICY_PAYLOAD, STAKEHOLDERS } from "@/lib/demo/scenario";
@@ -26,8 +26,9 @@ export default async function Home() {
           need to agree exactly what it will do, without breaking the bank&apos;s locked complaints policy. Walk through
           how Knowledge Lock gets them there.
         </p>
-        <div className="mt-7">
+        <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3">
           <StartButton />
+          <span className="text-sm text-ink/60">No sign-up. Everything here is fictional.</span>
         </div>
       </section>
 
@@ -66,6 +67,26 @@ export default async function Home() {
             View the locked policy
           </Link>
         </Card>
+      </section>
+
+      <section className="mt-12 flex flex-col gap-5 rounded-2xl border border-accent/35 bg-accent/[0.06] p-6 sm:p-8 md:flex-row md:items-center md:justify-between">
+        <div className="max-w-2xl">
+          <p className="text-xs font-semibold uppercase tracking-wider text-accent">The demo and the app</p>
+          <h2 className="mt-2 text-xl font-bold tracking-tight">Want to use it with your own team?</h2>
+          <p className="mt-2 text-[15px] leading-relaxed text-ink/75">
+            This demo uses a fictional bank and lets you act for everyone. The Knowledge Lock app at app.knowledge-lock.com is for
+            real organisations: each person signs in and signs off for themselves, with an optional passkey, Slack and Teams
+            notices, and an API for your own AI agents. It&apos;s open to a small group of design partners.
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-3">
+          <a href={`${APP_URL}/request-access`} className="inline-flex items-center rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:brightness-110">
+            Request access
+          </a>
+          <a href={`${APP_URL}/signin`} className="text-sm font-semibold text-steel hover:text-ink">
+            Sign in to the app
+          </a>
+        </div>
       </section>
     </Shell>
   );

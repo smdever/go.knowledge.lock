@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Lock } from "lucide-react";
 
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://guidedorchestration.com";
+/** The real product, for design partners. The demo links to it but never shares its data. */
+export const APP_URL = (process.env.NEXT_PUBLIC_KL_APP_URL || "https://app.knowledge-lock.com").replace(/\/$/, "");
 
 export default function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -15,9 +17,20 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             <span>Knowledge Lock</span>
             <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-semibold text-accent">Demo</span>
           </Link>
-          <a href={SITE_URL} className="hidden text-sm text-muted hover:text-ink sm:inline">
-            by Guided Orchestration
-          </a>
+          <nav className="flex shrink-0 items-center gap-4 text-sm">
+            <a href={SITE_URL} className="hidden text-muted hover:text-ink md:inline">
+              by Guided Orchestration
+            </a>
+            <a href={`${APP_URL}/signin`} className="hidden whitespace-nowrap text-ink/70 hover:text-ink sm:inline">
+              Sign in
+            </a>
+            <a
+              href={`${APP_URL}/request-access`}
+              className="whitespace-nowrap rounded-lg border border-accent/50 px-3 py-1.5 font-semibold text-accent hover:bg-accent/10"
+            >
+              Request access
+            </a>
+          </nav>
         </div>
       </header>
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-12">{children}</main>

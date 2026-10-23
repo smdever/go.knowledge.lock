@@ -10,6 +10,8 @@ import { addPasskey } from "@/lib/app/passkey-client";
 
 type Action = (prev: FormState, fd: FormData) => Promise<FormState>;
 
+const DEMO_URL = (process.env.NEXT_PUBLIC_KL_DEMO_URL || "https://knowledge-lock.com").replace(/\/$/, "");
+
 export const inputClass =
   "w-full rounded-lg border border-ink/20 bg-transparent px-3 py-2.5 text-[15px] outline-none focus:border-accent";
 
@@ -88,7 +90,8 @@ export function SignInForm({ action, next, email, dev }: { action: Action; next:
       <Result state={state} />
       <p className="mt-8 border-t border-ink/10 pt-6 text-sm text-ink/70">
         New to Knowledge Lock?{" "}
-        <a href="/request-access" className="font-semibold text-steel underline hover:text-ink">Request access</a>
+        <a href="/request-access" className="font-semibold text-steel underline hover:text-ink">Request access</a> or{" "}
+        <a href={DEMO_URL} className="font-semibold text-steel underline hover:text-ink">try the interactive demo</a>
       </p>
     </form>
   );
@@ -400,6 +403,11 @@ export function RequestAccessForm({ action }: { action: Action }) {
         <p className="mt-2 text-[15px] leading-relaxed text-ink/70">
           Knowledge Lock is open to a small group of design partners. Tell us a little about you and we&apos;ll be in touch. If
           your organisation already uses it, ask one of its owners to invite you instead.
+        </p>
+        <p className="mt-2 text-sm text-ink/65">
+          Want to look around first?{" "}
+          <a href={DEMO_URL} className="font-semibold text-steel underline hover:text-ink">Try the interactive demo</a>. No
+          sign-up, about three minutes.
         </p>
       </div>
       <div>

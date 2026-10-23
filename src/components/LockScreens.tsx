@@ -12,6 +12,7 @@ import Avatar from "./Avatar";
 import { useKL } from "./KLContext";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://guidedorchestration.com";
+const APP_URL = (process.env.NEXT_PUBLIC_KL_APP_URL || "https://app.knowledge-lock.com").replace(/\/$/, "");
 const PROVIDER_NAMES: Record<ProviderId, string> = { anthropic: "Anthropic", openai: "OpenAI", google: "Google" };
 
 type Tab = "record" | "verify" | "build";
@@ -256,12 +257,24 @@ export default function LockScreens({
               </>
             ) : null}
             {!product ? (
-              <p className="mt-8 text-[15px] text-ink/70">
-                That&apos;s Knowledge Lock.{" "}
-                <a href={`${SITE_URL}/#get-started`} className="font-semibold text-accent hover:underline">
-                  Talk to us about a pilot
-                </a>
-              </p>
+              <div className="mt-8 rounded-2xl border border-accent/35 bg-accent/[0.06] p-5 sm:p-6">
+                <h2 className="text-lg font-semibold">That&apos;s Knowledge Lock. Now try it for real.</h2>
+                <p className="mt-1 max-w-[62ch] text-[15px] leading-relaxed text-ink/75">
+                  In the app, your own team signs in and each person signs off for themselves, with an optional passkey. You
+                  also get Slack and Teams notices, and an API so your AI agents work from what you locked.
+                </p>
+                <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-3">
+                  <a href={`${APP_URL}/request-access`} className="inline-flex items-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:brightness-110">
+                    Request access
+                  </a>
+                  <a href={`${APP_URL}/signin`} className="text-sm font-semibold text-steel hover:text-ink">
+                    Sign in to the app
+                  </a>
+                  <a href={`${SITE_URL}/#get-started`} className="text-sm font-semibold text-steel hover:text-ink">
+                    Talk to us about a pilot
+                  </a>
+                </div>
+              </div>
             ) : null}
           </div>
           <Footer>
