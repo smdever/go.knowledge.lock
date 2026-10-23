@@ -1,4 +1,7 @@
-import { databaseUrl, ensureSchema, sql } from "@/lib/demo/store/postgres";
+import { databaseUrl, ensureSchema, markSchema, schemaIsCurrent, sql } from "@/lib/demo/store/postgres";
+
+/** Bump when the statements below change (see schemaIsCurrent). */
+const APP_SCHEMA_VERSION = 1;
 
 const g = globalThis as unknown as { __klAppSchema?: Promise<void> };
 
@@ -10,6 +13,7 @@ export async function appDb() {
     g.__klAppSchema = (async () => {
       // Locks, supersessions and usage counters use the same append-only tables as the demo.
       await ensureSchema();
+      if (await schemaIsCurrent(db, "app", APP_SCHEMA_VERSION)) return;
       await db`
         CREATE TABLE IF NOT EXISTS kl_organisations (
           id text PRIMARY KEY,
@@ -88,6 +92,7 @@ export async function appDb() {
       await db`
         CREATE TRIGGER kl_audit_append_only BEFORE UPDATE OR DELETE ON kl_audit
         FOR EACH ROW EXECUTE FUNCTION kl_forbid_change()`;
+      await markSchema(db, "app", APP_SCHEMA_VERSION);
     })().catch((err) => {
       g.__klAppSchema = undefined;
       throw err;

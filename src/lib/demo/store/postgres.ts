@@ -27,10 +27,34 @@ export function sql(): postgres.Sql {
  * Creates tables on first use. The locks and supersessions tables are append-only:
  * a trigger rejects any UPDATE or DELETE, so a stored lock cannot be changed in place.
  */
+/**
+ * Bump when the statements below change. A fresh server checks this with one query instead of
+ * re-running every statement, which keeps cold starts fast.
+ */
+const DEMO_SCHEMA_VERSION = 2;
+
+/** True when the named schema is already at this version. */
+export async function schemaIsCurrent(db: postgres.Sql, name: string, version: number): Promise<boolean> {
+  try {
+    const [row] = await db<{ version: number }[]>`SELECT version FROM kl_schema WHERE name = ${name}`;
+    return row?.version === version;
+  } catch {
+    return false; // kl_schema doesn't exist yet
+  }
+}
+
+export async function markSchema(db: postgres.Sql, name: string, version: number): Promise<void> {
+  await db`CREATE TABLE IF NOT EXISTS kl_schema (name text PRIMARY KEY, version integer NOT NULL)`;
+  await db.unsafe("ALTER TABLE kl_schema ENABLE ROW LEVEL SECURITY");
+  await db`INSERT INTO kl_schema (name, version) VALUES (${name}, ${version})
+           ON CONFLICT (name) DO UPDATE SET version = EXCLUDED.version`;
+}
+
 export async function ensureSchema(): Promise<void> {
   if (!g.__klSchema) {
     const db = sql();
     g.__klSchema = (async () => {
+      if (await schemaIsCurrent(db, "demo", DEMO_SCHEMA_VERSION)) return;
       await db`
         CREATE TABLE IF NOT EXISTS kl_records (
           id text PRIMARY KEY,
@@ -76,6 +100,7 @@ export async function ensureSchema(): Promise<void> {
       await db`
         CREATE TRIGGER kl_supersessions_append_only BEFORE UPDATE OR DELETE ON kl_supersessions
         FOR EACH ROW EXECUTE FUNCTION kl_forbid_change()`;
+      await markSchema(db, "demo", DEMO_SCHEMA_VERSION);
     })().catch((err) => {
       g.__klSchema = undefined;
       throw err;

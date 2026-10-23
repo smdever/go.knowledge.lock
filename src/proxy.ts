@@ -48,7 +48,8 @@ export async function proxy(request: NextRequest) {
       },
     },
   });
-  await supabase.auth.getUser();
+  // Refreshes an expired session if needed; otherwise verifies the token locally.
+  await supabase.auth.getClaims();
   return response;
 }
 

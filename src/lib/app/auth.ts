@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@supabase/ssr";
@@ -63,17 +64,22 @@ export async function supabaseServer() {
   });
 }
 
-export async function getUser(): Promise<AppUser | null> {
+/**
+ * The signed-in person, worked out once per request. getClaims checks the session token's signature
+ * locally (with Supabase's published signing keys), so most requests don't wait on Supabase's servers.
+ */
+export const getUser = cache(async (): Promise<AppUser | null> => {
   if (devAuthEnabled()) {
     const dev = readDevSession((await cookies()).get(DEV_COOKIE)?.value);
     if (dev) return dev;
   }
   if (!supabaseConfig()) return null;
   const supabase = await supabaseServer();
-  const { data } = await supabase.auth.getUser();
-  const email = data.user?.email?.toLowerCase();
-  return data.user && email ? { id: data.user.id, email } : null;
-}
+  const { data, error } = await supabase.auth.getClaims();
+  const sub = data?.claims?.sub;
+  const email = typeof data?.claims?.email === "string" ? data.claims.email.toLowerCase() : "";
+  return !error && sub && email ? { id: sub, email } : null;
+});
 
 export async function requireUser(next = "/app"): Promise<AppUser> {
   const user = await getUser();
