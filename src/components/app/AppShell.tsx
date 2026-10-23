@@ -16,9 +16,16 @@ export function Brand({ compact = false }: { compact?: boolean }) {
   );
 }
 
-export function LegalFooter() {
+export function LegalFooter({ links = [] }: { links?: { href: string; label: string }[] }) {
   return (
     <footer className="border-t border-ink/10">
+      {links.length ? (
+        <nav aria-label="More" className="mx-auto flex max-w-6xl flex-wrap gap-x-5 gap-y-2 px-4 pt-6 text-sm sm:hidden">
+          {links.map((l) => (
+            <Link key={l.href} href={l.href} className="text-ink/70 hover:text-ink">{l.label}</Link>
+          ))}
+        </nav>
+      ) : null}
       <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-6 text-xs text-muted sm:flex-row sm:justify-between sm:px-6">
         <span>Knowledge Lock by Guided Orchestration Ltd</span>
         <span className="flex gap-4">
@@ -46,16 +53,19 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
 }
 
 export default function AppShell({ ctx, children }: { ctx: AppContext; children: React.ReactNode }) {
-  const nav = [
+  // `more` links sit in the header from tablet width up, and in the footer on phones.
+  const nav: { href: string; label: string; more?: boolean }[] = [
     { href: "/app", label: "Home" },
     ...(ctx.current
       ? [
           { href: "/app/policies", label: "Policy" },
           { href: "/app/team", label: "Team" },
+          ...(ctx.current.role === "owner" ? [{ href: "/app/activity", label: "Activity", more: true }] : []),
         ]
       : []),
-    { href: "/app/profile", label: "Profile" },
-    ...(ctx.admin ? [{ href: "/app/admin", label: "Admin" }] : []),
+    { href: "/app/guide", label: "Guide", more: true },
+    { href: "/app/profile", label: "Profile", more: true },
+    ...(ctx.admin ? [{ href: "/app/admin", label: "Admin", more: true }] : []),
   ];
   return (
     <div className="flex min-h-screen flex-col">
@@ -87,7 +97,9 @@ export default function AppShell({ ctx, children }: { ctx: AppContext; children:
           <div className="flex items-center gap-4 text-sm">
             <nav className="flex items-center gap-3 sm:gap-4">
               {nav.map((n) => (
-                <Link key={n.href} href={n.href} className="text-ink/70 hover:text-ink">{n.label}</Link>
+                <Link key={n.href} href={n.href} className={`text-ink/70 hover:text-ink ${n.more ? "hidden sm:inline" : ""}`}>
+                  {n.label}
+                </Link>
               ))}
             </nav>
             <form action={signOut}>
@@ -100,7 +112,7 @@ export default function AppShell({ ctx, children }: { ctx: AppContext; children:
         </div>
       </header>
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-12">{children}</main>
-      <LegalFooter />
+      <LegalFooter links={nav.filter((n) => n.more)} />
     </div>
   );
 }

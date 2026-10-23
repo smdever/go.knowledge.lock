@@ -10,6 +10,7 @@ export { ROLE_LABEL, ROLES, type Role } from "./roles";
 export class AppError extends Error {}
 
 const INVITE_DAYS = 7;
+const MAX_PENDING_INVITES = 50;
 const newId = (prefix: string) => `${prefix}_${randomUUID().replace(/-/g, "").slice(0, 16)}`;
 const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
 const normEmail = (email: string) => email.trim().toLowerCase();
@@ -166,6 +167,10 @@ export async function createInvite(orgId: string, actor: AppUser, emailRaw: unkn
   const db = await appDb();
   const [existing] = await db`SELECT 1 FROM kl_members WHERE org_id = ${orgId} AND email = ${email}`;
   if (existing) throw new AppError(`${email} is already in this organisation.`);
+  const [pending] = await db<{ n: number }[]>`
+    SELECT count(*)::int AS n FROM kl_invites
+    WHERE org_id = ${orgId} AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at > now()`;
+  if (pending.n >= MAX_PENDING_INVITES) throw new AppError(`There are already ${MAX_PENDING_INVITES} invites waiting. Cancel some before sending more.`);
   return insertInvite(orgId, actor, email, roleRaw);
 }
 

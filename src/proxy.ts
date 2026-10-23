@@ -17,6 +17,15 @@ export async function proxy(request: NextRequest) {
   if (!appMode) return PRODUCT_ROUTES.some((r) => r.test(path)) ? notFound(request) : NextResponse.next();
 
   if (DEMO_ROUTES.some((r) => r.test(path))) return notFound(request);
+
+  // Product API calls that change things must come from the product's own pages.
+  if (path.startsWith("/api/app/") && request.method !== "GET" && request.method !== "HEAD") {
+    const origin = request.headers.get("origin");
+    const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
+    if (origin && host && new URL(origin).host !== host) {
+      return NextResponse.json({ error: "Cross-site request refused." }, { status: 403 });
+    }
+  }
   if (path === "/") return NextResponse.redirect(new URL("/app", request.url));
 
   const env = process.env;

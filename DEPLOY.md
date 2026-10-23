@@ -78,6 +78,7 @@ Create a second project from this repo (e.g. `knowledge-lock-app`) and add the d
 | `NEXT_PUBLIC_SITE_URL` | `https://guidedorchestration.com` |
 | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` | Needed from phase 2 (model review) |
 | `KL_ORG_HOURLY_LIMIT` | Optional. AI calls per organisation per hour (default 300) |
+| `KL_SUPPORT_EMAIL` | Optional. The help address shown in the in-app guide (default `hello@guidedorchestration.com`) |
 
 ### 3. First sign-in
 Go to app.knowledge-lock.com, sign in with your admin email, open **Admin** and create an organisation for each design partner. Its owner gets an invite and invites the rest of their team from **Team**. Only people with an account, a pending invite or admin rights are sent sign-in links.
@@ -90,3 +91,10 @@ Go to app.knowledge-lock.com, sign in with your admin email, open **Admin** and 
 
 ### Running the product locally
 In `.env.local`: `KL_MODE=app`, `KL_DEV_AUTH=1` (sign in as any email without Supabase; never active on Vercel), `KL_ADMIN_EMAILS=you@example.com` and a local `DATABASE_URL`. Invite links are printed in the terminal when Resend isn't set up.
+
+### Before design partners put real material in
+- **Server region:** in the product's Vercel project, **Settings → Functions → Function Region**, choose **London (lhr1)** so requests are handled next to the London database. Vercel's default is Washington DC.
+- **Backups:** Supabase's free plan has no automatic backups. Move the product's Supabase project to the Pro plan (daily backups, kept 7 days) before partners rely on it.
+- **MFA:** turn on two-factor sign-in for Vercel, Supabase, GitHub and Resend.
+- **Emails the product sends:** sign-in links (from Supabase), invites, "your sign-off is needed" (once per wording, after the AI reviewers pass it), "changes requested" and "locked". Nobody is emailed about their own action.
+- **Security already in place:** security headers on every response, cross-site requests to the product API are refused, organisation-scoped access on every record and lock, invite links are single-use and expire after 7 days, at most 50 pending invites per organisation, and an append-only activity log owners can read under **Activity**.

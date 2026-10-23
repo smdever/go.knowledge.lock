@@ -42,6 +42,8 @@ import { postgresStore } from "@/lib/demo/store/postgres";
 import type { DemoRecord, FixSuggestion, ProviderId, RecordView } from "@/lib/demo/types";
 import type { AppUser } from "./auth";
 import { appDb } from "./db";
+import { noticeEmail, sendEmail } from "./email";
+import { appUrl } from "@/lib/mode";
 import { AppError, audit, getProfile } from "./orgs";
 import type { Role } from "./roles";
 
@@ -61,6 +63,8 @@ export interface AppRecord extends DemoRecord {
   createdBy: string;
   signers: SignerRef[];
   quorum: number;
+  /** Who has been emailed that their sign-off is needed, for which wording. Stops repeat emails. */
+  notified?: { hash: string; userIds: string[] };
 }
 
 export const MAX_CLAIMS = 30;
@@ -131,6 +135,59 @@ export async function policyClaimsFor(orgId: string, policyLockId: string | null
   return lock?.block.payload.claims ?? [];
 }
 
+// ---------- Emails ----------
+
+const recordUrl = (id: string) => `${appUrl()}/app/r/${id}`;
+const lockUrl = (lockId: string) => `${appUrl()}/app/l/${lockId}`;
+
+async function emailOf(userId: string): Promise<string | null> {
+  const db = await appDb();
+  const [row] = await db<{ email: string }[]>`SELECT email FROM kl_members WHERE user_id = ${userId} LIMIT 1`;
+  return row?.email ?? null;
+}
+
+/** Sends one email per address, never to the person who caused it. Failures are logged, never thrown. */
+async function notify(emails: (string | null)[], exclude: string, mail: ReturnType<typeof noticeEmail>) {
+  const to = [...new Set(emails.filter((e): e is string => Boolean(e) && e !== exclude))];
+  await Promise.all(
+    to.map((addr) =>
+      sendEmail(addr, mail.subject, mail.html, mail.text).catch((err) => console.error("[knowledge-lock] notify failed", err))
+    )
+  );
+}
+
+const what = (r: AppRecord) => (r.kind === "policy" ? "the policy" : `"${r.payload.title}"`);
+
+/** Once the AI reviewers pass the current wording, ask the signers who haven't signed it yet. Only once per wording. */
+async function askForSignOffs(record: AppRecord, org: Org, actor: AppUser) {
+  const policy = consensusPolicy(record);
+  const m = evaluateConsensus(record.attestations, policy, record.payloadHash).metrics;
+  const modelsPass = m.modelRejections === 0 && m.distinctModelCount >= policy.modelRules.minDistinctModels;
+  if (!modelsPass) return;
+  const signed = new Set(
+    record.attestations.filter((a) => a.attestorType === "human" && a.subjectHash === record.payloadHash).map((a) => a.role)
+  );
+  const already = record.notified?.hash === record.payloadHash ? record.notified.userIds : [];
+  const due = record.signers.filter((s) => !signed.has(signerKey(s.userId)) && !already.includes(s.userId) && s.userId !== actor.id);
+  if (!due.length) return;
+  record.notified = { hash: record.payloadHash, userIds: [...already, ...due.map((s) => s.userId)] };
+  await notify(
+    due.map((s) => s.email),
+    actor.email,
+    noticeEmail({
+      orgName: org.name,
+      subject: `Your sign-off is needed: ${record.payload.title}`,
+      heading: `Your sign-off is needed on ${what(record)}`,
+      lines: [
+        `The AI reviewers have approved v${record.version} of ${what(record)} in ${org.name}. ${record.quorum} of ${record.signers.length} signers need to approve it before it can be locked.`,
+        "Read the exact wording, then sign it off or ask for changes.",
+      ],
+      cta: "Review and sign off",
+      url: recordUrl(record.id),
+    })
+  );
+}
+
 // ---------- Rules ----------
 
 /** Models: at least two providers approve with no objections. People: the quorum approves and nobody objects. */
@@ -172,6 +229,7 @@ function buildPayload(record: AppRecord, orgName: string, title: string, claims:
 
 export async function viewFor(record: AppRecord, user: AppUser, role: Role): Promise<RecordView> {
   const org = await getOrg(record.orgId);
+  const current = new Set((await eligibleSigners(record.orgId)).map((s) => s.userId));
   return {
     record,
     evaluation: evaluateConsensus(record.attestations, consensusPolicy(record), record.payloadHash),
@@ -181,9 +239,10 @@ export async function viewFor(record: AppRecord, user: AppUser, role: Role): Pro
     signers: record.signers.map((s) => ({
       key: signerKey(s.userId),
       name: s.name,
-      title: s.title,
+      // Someone who has left, or become a viewer, can no longer sign.
+      title: current.has(s.userId) ? s.title : "No longer a signer in this organisation",
       email: s.email,
-      canSign: s.userId === user.id,
+      canSign: s.userId === user.id && current.has(s.userId),
     })),
     quorum: record.quorum,
     canEdit: role !== "viewer",
@@ -316,7 +375,7 @@ export async function createRecord(
   record.payload = buildPayload(record, org.name, title, claims, org.policyLockId);
   record.payloadHash = await computeCanonicalPayloadHash(record.payload);
   await saveRecord(record);
-  await audit(orgId, user, "record.created", record.id, { kind, signers: signers.length, quorum });
+  await audit(orgId, user, "record.created", record.id, { kind, version: 1, signers: signers.length, quorum });
   return record;
 }
 
@@ -376,7 +435,10 @@ export async function runReview(user: AppUser, id: string): Promise<AppRecord> {
   }
   mergeReviews(latest, reviews);
   latest.updatedAt = Date.now();
+  await askForSignOffs(latest, org, user);
   await saveRecord(latest);
+  const objections = reviews.filter((r) => r.decision === "REJECT").length;
+  await audit(latest.orgId, user, "record.reviewed", latest.id, { version: latest.version, objections });
   return latest;
 }
 
@@ -420,6 +482,9 @@ export async function signOff(user: AppUser, id: string, input: { decision?: unk
   assertDraft(record);
   const signer = record.signers.find((s) => s.userId === user.id);
   if (!signer) throw new DemoError("You're not one of the signers for this record.", 403);
+  if (!(await eligibleSigners(record.orgId)).some((s) => s.userId === user.id)) {
+    throw new DemoError("Only owners and signers can sign off. Ask an owner to change your role.", 403);
+  }
   if (input.decision !== "APPROVE" && input.decision !== "REJECT") throw new DemoError("Choose approve or request changes.");
   const comment = typeof input.comment === "string" ? input.comment.trim().slice(0, 400) : "";
   if (input.decision === "REJECT" && !comment) throw new DemoError("Say what needs to change.");
@@ -446,6 +511,21 @@ export async function signOff(user: AppUser, id: string, input: { decision?: unk
     version: record.version,
     ...(comment ? { comment } : {}),
   });
+  if (input.decision === "REJECT") {
+    const org = await getOrg(record.orgId);
+    await notify(
+      [await emailOf(record.createdBy), ...record.signers.map((s) => s.email)],
+      user.email,
+      noticeEmail({
+        orgName: org.name,
+        subject: `Changes requested: ${record.payload.title}`,
+        heading: `${name} asked for changes to ${what(record)}`,
+        lines: [`"${comment}"`, "Nothing can be locked until they approve or the wording changes."],
+        cta: "Open the record",
+        url: recordUrl(record.id),
+      })
+    );
+  }
   return record;
 }
 
@@ -478,6 +558,22 @@ export async function lockRecord(user: AppUser, id: string): Promise<string> {
   record.updatedAt = Date.now();
   await saveRecord(record);
   await audit(record.orgId, user, "record.locked", record.id, { lockId: block.lockId, kind: record.kind, version: record.version });
+  const org = await getOrg(record.orgId);
+  await notify(
+    [await emailOf(record.createdBy), ...record.signers.map((s) => s.email)],
+    user.email,
+    noticeEmail({
+      orgName: org.name,
+      subject: `Locked: ${record.payload.title}`,
+      heading: `${what(record).replace(/^the/, "The")} is locked`,
+      lines: [
+        `v${record.version} of ${what(record)} is now the signed-off version in ${org.name}. Teams and AI agents work from exactly this wording.`,
+        record.kind === "policy" ? "From now on, new records are checked against it." : "Any change becomes a new version and goes back through review.",
+      ],
+      cta: "See the locked record",
+      url: lockUrl(block.lockId),
+    })
+  );
   return block.lockId;
 }
 
