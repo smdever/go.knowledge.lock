@@ -15,6 +15,7 @@ import {
   checkEmail,
   createInvite,
   createOrganisation,
+  isAdmin,
   mayRequestSignIn,
   removeMember,
   revokeInvite,
@@ -26,6 +27,7 @@ import {
 import { removePasskey } from "@/lib/app/passkeys";
 import { addChannel, checkSlackId, removeChannel, testChannel } from "@/lib/app/channels";
 import { appDb } from "@/lib/app/db";
+import { closeAccessRequest, getAccessRequest, submitAccessRequest } from "@/lib/app/access";
 import { withdrawPasskeySignOffs } from "@/lib/app/records";
 
 export interface FormState {
@@ -289,4 +291,53 @@ export async function saveSlackIdAction(_prev: FormState, fd: FormData): Promise
     revalidatePath("/app/profile");
     return { message: id ? "Saved. Slack notices will @mention you." : "Removed." };
   });
+}
+
+// ---------- Access requests ----------
+
+export async function requestAccessAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  return attempt(async () => {
+    const h = await headers();
+    const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "local";
+    await submitAccessRequest(
+      {
+        name: str(fd, "name"),
+        email: str(fd, "email"),
+        company: str(fd, "company"),
+        title: str(fd, "title"),
+        message: str(fd, "message"),
+        website: str(fd, "website"),
+      },
+      ip
+    );
+    return { sentTo: str(fd, "email").trim() };
+  });
+}
+
+/** Admin: create the requester's organisation and invite them as its owner. */
+export async function approveAccessAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  return attempt(async () => {
+    const { user, profile } = await getContext("/app/admin");
+    if (!isAdmin(user.email)) throw new AppError("You don't have permission to do that.");
+    const req = await getAccessRequest(str(fd, "id"));
+    if (!req) throw new AppError("That request has already been dealt with.");
+    const orgName = str(fd, "orgName").trim() || req.company;
+    const { orgId, name, ownerEmail, token } = await createOrganisation(user, orgName, req.email);
+    await closeAccessRequest(user, req.id, "approved", orgId);
+    const link = `${await baseUrl()}/invite/${token}`;
+    const mail = inviteEmail({ orgName: name, inviter: profile?.name || "Guided Orchestration", role: "owner", url: link });
+    const sent = await sendEmail(ownerEmail, mail.subject, mail.html, mail.text);
+    revalidatePath("/app/admin");
+    return {
+      message: sent ? `${name} created. Invite sent to ${ownerEmail}.` : `${name} created. Email isn't set up yet, so send ${ownerEmail} this link:`,
+      link: sent ? undefined : link,
+    };
+  });
+}
+
+export async function dismissAccessAction(fd: FormData) {
+  const { user } = await getContext("/app/admin");
+  if (!isAdmin(user.email)) return;
+  await closeAccessRequest(user, str(fd, "id"), "dismissed");
+  revalidatePath("/app/admin");
 }

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const PRODUCT_ROUTES = [/^\/app(\/|$)/, /^\/api\/app\//, /^\/api\/v1\//, /^\/signin(\/|$)/, /^\/auth\//, /^\/invite\//];
+const PRODUCT_ROUTES = [/^\/app(\/|$)/, /^\/api\/app\//, /^\/api\/v1\//, /^\/signin(\/|$)/, /^\/request-access(\/|$)/, /^\/auth\//, /^\/invite\//];
 const DEMO_ROUTES = [/^\/r\//, /^\/l\//, /^\/api\/records/, /^\/api\/locks/];
 
 const notFound = (request: NextRequest) => NextResponse.rewrite(new URL("/_kl-not-found", request.url));

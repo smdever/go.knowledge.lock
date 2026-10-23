@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
-import { CreateOrgForm } from "@/components/app/forms";
-import { createOrgAction } from "@/app/app/actions";
+import { AccessRequests, CreateOrgForm } from "@/components/app/forms";
+import { approveAccessAction, createOrgAction, dismissAccessAction } from "@/app/app/actions";
+import { listAccessRequests } from "@/lib/app/access";
 import { getContext } from "@/lib/app/context";
 import { listOrganisations } from "@/lib/app/orgs";
 
@@ -9,7 +10,7 @@ const fmt = (d: Date) => new Intl.DateTimeFormat("en-GB", { day: "numeric", mont
 export default async function AdminPage() {
   const ctx = await getContext("/app/admin");
   if (!ctx.admin) notFound();
-  const orgs = await listOrganisations();
+  const [orgs, requests] = await Promise.all([listOrganisations(), listAccessRequests()]);
   return (
     <div className="max-w-4xl">
       <p className="text-sm font-semibold text-accent">Admin</p>
@@ -19,7 +20,19 @@ export default async function AdminPage() {
       </p>
 
       <section className="mt-8">
-        <CreateOrgForm action={createOrgAction} />
+        <h2 className="text-lg font-semibold">Access requests ({requests.length})</h2>
+        <AccessRequests
+          approve={approveAccessAction}
+          dismiss={dismissAccessAction}
+          requests={requests.map((r) => ({ ...r, created: fmt(r.createdAt) }))}
+        />
+      </section>
+
+      <section className="mt-10">
+        <h2 className="text-lg font-semibold">Create an organisation</h2>
+        <div className="mt-4">
+          <CreateOrgForm action={createOrgAction} />
+        </div>
       </section>
 
       <section className="mt-10">

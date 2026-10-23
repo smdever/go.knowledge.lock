@@ -70,6 +70,10 @@ export function SignInForm({ action, next, email, dev }: { action: Action; next:
           If <strong>{state.sentTo}</strong> has access to Knowledge Lock, we&apos;ve sent a sign-in link to it. The link
           works once and expires after an hour.
         </p>
+        <p className="mt-6 text-sm text-ink/70">
+          Nothing arrived and you&apos;re new here?{" "}
+          <a href="/request-access" className="font-semibold text-steel underline hover:text-ink">Request access</a>
+        </p>
       </div>
     );
   return (
@@ -82,6 +86,10 @@ export function SignInForm({ action, next, email, dev }: { action: Action; next:
       <Submit className="mt-4 w-full">Email me a sign-in link</Submit>
       {dev ? <p className="mt-3 text-xs text-warn">Local dev sign-in is on: you&apos;ll be signed in straight away.</p> : null}
       <Result state={state} />
+      <p className="mt-8 border-t border-ink/10 pt-6 text-sm text-ink/70">
+        New to Knowledge Lock?{" "}
+        <a href="/request-access" className="font-semibold text-steel underline hover:text-ink">Request access</a>
+      </p>
     </form>
   );
 }
@@ -367,5 +375,137 @@ function TextSubmit({ children }: { children: React.ReactNode }) {
     <button type="submit" disabled={pending} className="text-sm font-semibold text-steel hover:text-ink disabled:opacity-50">
       {pending ? "Sending…" : children}
     </button>
+  );
+}
+
+export function RequestAccessForm({ action }: { action: Action }) {
+  const [state, formAction] = useActionState(action, {});
+  if (state.sentTo)
+    return (
+      <div role="status">
+        <h1 className="text-2xl font-semibold tracking-tight">Thanks, we&apos;ve got your request</h1>
+        <p className="mt-3 text-[15px] leading-relaxed text-ink/75">
+          We&apos;ll get back to you at <strong>{state.sentTo}</strong>, usually within two working days. If your organisation is
+          already on Knowledge Lock, one of its owners can invite you straight away.
+        </p>
+        <p className="mt-6 text-sm">
+          <a href="/signin" className="font-semibold text-steel underline hover:text-ink">Back to sign in</a>
+        </p>
+      </div>
+    );
+  return (
+    <form action={formAction} className="space-y-4">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Request access</h1>
+        <p className="mt-2 text-[15px] leading-relaxed text-ink/70">
+          Knowledge Lock is open to a small group of design partners. Tell us a little about you and we&apos;ll be in touch. If
+          your organisation already uses it, ask one of its owners to invite you instead.
+        </p>
+      </div>
+      <div>
+        <label htmlFor="ra-name" className="block text-sm font-semibold">Your name</label>
+        <input id="ra-name" name="name" required maxLength={80} autoComplete="name" className={`mt-2 ${inputClass}`} />
+      </div>
+      <div>
+        <label htmlFor="ra-email" className="block text-sm font-semibold">Work email</label>
+        <input id="ra-email" name="email" type="email" required autoComplete="email" className={`mt-2 ${inputClass}`} />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="ra-company" className="block text-sm font-semibold">Organisation</label>
+          <input id="ra-company" name="company" required maxLength={120} autoComplete="organization" className={`mt-2 ${inputClass}`} />
+        </div>
+        <div>
+          <label htmlFor="ra-title" className="block text-sm font-semibold">Job title</label>
+          <input id="ra-title" name="title" maxLength={80} autoComplete="organization-title" className={`mt-2 ${inputClass}`} />
+        </div>
+      </div>
+      <div>
+        <label htmlFor="ra-message" className="block text-sm font-semibold">What would you like to use it for? (optional)</label>
+        <textarea id="ra-message" name="message" rows={4} maxLength={1000} className={`mt-2 ${inputClass}`} />
+      </div>
+      {/* Hidden from people; catches bots. */}
+      <div aria-hidden="true" className="absolute -left-[9999px] h-px w-px overflow-hidden">
+        <label htmlFor="ra-website">Website</label>
+        <input id="ra-website" name="website" tabIndex={-1} autoComplete="off" />
+      </div>
+      <Submit className="w-full">Send request</Submit>
+      <p className="text-xs text-muted">
+        We use these details only to reply to you and set up access. See our{" "}
+        <a href={`${process.env.NEXT_PUBLIC_SITE_URL || "https://guidedorchestration.com"}/privacy`} className="underline hover:text-ink">
+          privacy notice
+        </a>
+        .
+      </p>
+      <Result state={state} />
+      <p className="border-t border-ink/10 pt-6 text-sm text-ink/70">
+        Already have access? <a href="/signin" className="font-semibold text-steel underline hover:text-ink">Sign in</a>
+      </p>
+    </form>
+  );
+}
+
+export interface AccessRequestView {
+  id: string;
+  name: string;
+  email: string;
+  company: string;
+  title: string;
+  message: string;
+  created: string;
+}
+
+/** Pending access requests. One result area above the list, so it stays put when an approved request drops off. */
+export function AccessRequests({
+  requests,
+  approve,
+  dismiss,
+}: {
+  requests: AccessRequestView[];
+  approve: Action;
+  dismiss: (fd: FormData) => Promise<void>;
+}) {
+  const [state, formAction] = useActionState(approve, {});
+  return (
+    <div>
+      <Result state={state} />
+      {requests.length ? (
+        <ul className="mt-3 divide-y divide-ink/10 border-y border-ink/10">
+          {requests.map((r) => (
+            <li key={r.id} className="py-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold">
+                    {r.name}
+                    {r.title ? <span className="font-normal text-ink/70">, {r.title}</span> : null}
+                    <span className="font-normal text-ink/70"> at {r.company}</span>
+                  </p>
+                  <p className="text-sm text-ink/60">
+                    <a href={`mailto:${r.email}`} className="hover:text-ink">{r.email}</a> · {r.created}
+                  </p>
+                  {r.message ? <p className="mt-2 max-w-2xl whitespace-pre-line text-sm text-ink/80">&ldquo;{r.message}&rdquo;</p> : null}
+                </div>
+                <form action={dismiss}>
+                  <input type="hidden" name="id" value={r.id} />
+                  <button type="submit" className="text-sm text-muted hover:text-bad">Dismiss</button>
+                </form>
+              </div>
+              <form action={formAction} className="mt-3">
+                <input type="hidden" name="id" value={r.id} />
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                  <div className="sm:flex-1">
+                    <label htmlFor={`org-${r.id}`} className="block text-xs font-semibold text-ink/70">Organisation name</label>
+                    <input id={`org-${r.id}`} name="orgName" defaultValue={r.company} maxLength={80} className={`mt-1 ${inputClass}`} />
+                  </div>
+                  <Submit>Create and invite as owner</Submit>
+                </div>
+              </form>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-3 text-sm text-ink/65">No requests waiting. People can ask for access from the sign-in page.</p>
+      )}
+    </div>
   );
 }

@@ -1,7 +1,7 @@
 import { databaseUrl, ensureSchema, markSchema, schemaIsCurrent, sql } from "@/lib/demo/store/postgres";
 
 /** Bump when the statements below change (see schemaIsCurrent). */
-const APP_SCHEMA_VERSION = 4;
+const APP_SCHEMA_VERSION = 5;
 
 const g = globalThis as unknown as { __klAppSchema?: Promise<void> };
 
@@ -132,10 +132,27 @@ export async function appDb() {
         )`;
       await db`CREATE INDEX IF NOT EXISTS kl_channels_org ON kl_channels (org_id)`;
       await db`ALTER TABLE kl_profiles ADD COLUMN IF NOT EXISTS slack_member_id text`;
+      // Requests for access from the sign-in page.
+      await db`
+        CREATE TABLE IF NOT EXISTS kl_access_requests (
+          id text PRIMARY KEY,
+          name text NOT NULL,
+          email text NOT NULL,
+          company text NOT NULL,
+          title text NOT NULL DEFAULT '',
+          message text NOT NULL DEFAULT '',
+          ip_hash text,
+          status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'dismissed')),
+          created_at timestamptz NOT NULL DEFAULT now(),
+          handled_by text,
+          handled_at timestamptz,
+          org_id text
+        )`;
+      await db`CREATE INDEX IF NOT EXISTS kl_access_requests_status ON kl_access_requests (status, created_at DESC)`;
       await db`CREATE INDEX IF NOT EXISTS kl_members_user ON kl_members (user_id)`;
       await db`CREATE INDEX IF NOT EXISTS kl_invites_org ON kl_invites (org_id)`;
       await db`CREATE INDEX IF NOT EXISTS kl_audit_org ON kl_audit (org_id, at)`;
-      for (const table of ["kl_organisations", "kl_profiles", "kl_members", "kl_invites", "kl_audit", "kl_app_records", "kl_api_keys", "kl_passkeys", "kl_passkey_challenges", "kl_channels"]) {
+      for (const table of ["kl_organisations", "kl_profiles", "kl_members", "kl_invites", "kl_audit", "kl_app_records", "kl_api_keys", "kl_passkeys", "kl_passkey_challenges", "kl_channels", "kl_access_requests"]) {
         await db.unsafe(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`);
       }
       // The audit log is append-only, like locks.
