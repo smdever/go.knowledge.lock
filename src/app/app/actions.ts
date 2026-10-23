@@ -149,8 +149,13 @@ export async function inviteAction(_prev: FormState, fd: FormData): Promise<Form
     const role = str(fd, "role") as Role;
     const { token } = await createInvite(org.orgId, user, email, role);
     const link = `${await baseUrl()}/invite/${token}`;
-    const mail = inviteEmail({ orgName: org.orgName, inviter: profile?.name || user.email, role: ROLE_LABEL[role].toLowerCase(), url: link });
-    const sent = await sendEmail(email, mail.subject, mail.html, mail.text);
+    const mail = inviteEmail({
+      orgName: org.orgName,
+      inviter: { name: profile?.name || user.email, title: profile?.title, email: user.email },
+      role,
+      url: link,
+    });
+    const sent = await sendEmail(email, mail.subject, mail.html, mail.text, { fromName: mail.fromName, replyTo: mail.replyTo });
     revalidatePath("/app/team");
     return {
       message: sent ? `Invite sent to ${email}.` : `Invite created for ${email}. Email isn't set up yet, so send them this link:`,
@@ -207,8 +212,14 @@ export async function createOrgAction(_prev: FormState, fd: FormData): Promise<F
     const { user, profile } = await getContext();
     const { name, ownerEmail, token } = await createOrganisation(user, str(fd, "name"), str(fd, "ownerEmail"));
     const link = `${await baseUrl()}/invite/${token}`;
-    const mail = inviteEmail({ orgName: name, inviter: profile?.name || "Guided Orchestration", role: "owner", url: link });
-    const sent = await sendEmail(ownerEmail, mail.subject, mail.html, mail.text);
+    const mail = inviteEmail({
+      orgName: name,
+      inviter: { name: profile?.name || "Guided Orchestration", title: profile?.title, email: user.email },
+      onBehalfOf: "Guided Orchestration",
+      role: "owner",
+      url: link,
+    });
+    const sent = await sendEmail(ownerEmail, mail.subject, mail.html, mail.text, { fromName: mail.fromName, replyTo: mail.replyTo });
     revalidatePath("/app/admin");
     return {
       message: sent ? `${name} created. Invite sent to ${ownerEmail}.` : `${name} created. Email isn't set up yet, so send ${ownerEmail} this link:`,
@@ -325,8 +336,14 @@ export async function approveAccessAction(_prev: FormState, fd: FormData): Promi
     const { orgId, name, ownerEmail, token } = await createOrganisation(user, orgName, req.email);
     await closeAccessRequest(user, req.id, "approved", orgId);
     const link = `${await baseUrl()}/invite/${token}`;
-    const mail = inviteEmail({ orgName: name, inviter: profile?.name || "Guided Orchestration", role: "owner", url: link });
-    const sent = await sendEmail(ownerEmail, mail.subject, mail.html, mail.text);
+    const mail = inviteEmail({
+      orgName: name,
+      inviter: { name: profile?.name || "Guided Orchestration", title: profile?.title, email: user.email },
+      onBehalfOf: "Guided Orchestration",
+      role: "owner",
+      url: link,
+    });
+    const sent = await sendEmail(ownerEmail, mail.subject, mail.html, mail.text, { fromName: mail.fromName, replyTo: mail.replyTo });
     revalidatePath("/app/admin");
     return {
       message: sent ? `${name} created. Invite sent to ${ownerEmail}.` : `${name} created. Email isn't set up yet, so send ${ownerEmail} this link:`,
