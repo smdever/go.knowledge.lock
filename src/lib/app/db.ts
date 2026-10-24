@@ -1,7 +1,7 @@
 import { databaseUrl, ensureSchema, markSchema, schemaIsCurrent, sql } from "@/lib/demo/store/postgres";
 
 /** Bump when the statements below change (see schemaIsCurrent). */
-const APP_SCHEMA_VERSION = 5;
+const APP_SCHEMA_VERSION = 6;
 
 const g = globalThis as unknown as { __klAppSchema?: Promise<void> };
 
@@ -149,10 +149,49 @@ export async function appDb() {
           org_id text
         )`;
       await db`CREATE INDEX IF NOT EXISTS kl_access_requests_status ON kl_access_requests (status, created_at DESC)`;
+      // Jira Cloud: one connection per organisation (API token and webhook secret encrypted), and linked issues.
+      await db`
+        CREATE TABLE IF NOT EXISTS kl_jira (
+          org_id text PRIMARY KEY REFERENCES kl_organisations(id),
+          site text NOT NULL,
+          email text NOT NULL,
+          token_sealed text NOT NULL,
+          secret_sealed text NOT NULL,
+          account_name text NOT NULL DEFAULT '',
+          auto_check boolean NOT NULL DEFAULT true,
+          connected_by text NOT NULL,
+          connected_at timestamptz NOT NULL DEFAULT now(),
+          last_webhook_at timestamptz,
+          last_error text
+        )`;
+      await db`
+        CREATE TABLE IF NOT EXISTS kl_jira_links (
+          id text PRIMARY KEY,
+          org_id text NOT NULL REFERENCES kl_organisations(id),
+          issue_id text NOT NULL,
+          issue_key text NOT NULL,
+          issue_summary text NOT NULL DEFAULT '',
+          lock_id text NOT NULL,
+          record_id text NOT NULL,
+          claim_id text,
+          status text NOT NULL,
+          result_summary text NOT NULL DEFAULT '',
+          findings jsonb NOT NULL DEFAULT '[]'::jsonb,
+          result_key text,
+          text_hash text,
+          checked_at timestamptz,
+          checked_by text,
+          auto boolean NOT NULL DEFAULT false,
+          linked_by text NOT NULL,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          unlinked_at timestamptz
+        )`;
+      await db`CREATE INDEX IF NOT EXISTS kl_jira_links_lock ON kl_jira_links (org_id, lock_id)`;
+      await db`CREATE UNIQUE INDEX IF NOT EXISTS kl_jira_links_issue ON kl_jira_links (org_id, issue_id) WHERE unlinked_at IS NULL`;
       await db`CREATE INDEX IF NOT EXISTS kl_members_user ON kl_members (user_id)`;
       await db`CREATE INDEX IF NOT EXISTS kl_invites_org ON kl_invites (org_id)`;
       await db`CREATE INDEX IF NOT EXISTS kl_audit_org ON kl_audit (org_id, at)`;
-      for (const table of ["kl_organisations", "kl_profiles", "kl_members", "kl_invites", "kl_audit", "kl_app_records", "kl_api_keys", "kl_passkeys", "kl_passkey_challenges", "kl_channels", "kl_access_requests"]) {
+      for (const table of ["kl_organisations", "kl_profiles", "kl_members", "kl_invites", "kl_audit", "kl_app_records", "kl_api_keys", "kl_passkeys", "kl_passkey_challenges", "kl_channels", "kl_access_requests", "kl_jira", "kl_jira_links"]) {
         await db.unsafe(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`);
       }
       // The audit log is append-only, like locks.

@@ -67,6 +67,18 @@ export async function listActivity(orgId: string, limit = 200): Promise<Activity
         return { ...base, text: "made passkeys optional for sign-offs on new records" };
       case "access_request.approved":
         return { ...base, text: `approved ${r.target}'s request for access` };
+      case "jira.connected":
+        return { ...base, text: `connected Jira (${String(r.target).replace(/^https?:\/\//, "")})` };
+      case "jira.disconnected":
+        return { ...base, text: "disconnected Jira" };
+      case "jira.checked": {
+        const result = d.status === "clear" ? "matches" : d.status === "departs" ? "departs from what was agreed" : "adds things not agreed";
+        return { ...base, text: `${d.auto ? "re-checked" : "checked"} Jira issue ${r.target}: ${result}`, ...(!r.actorName && !r.actorEmail ? { actor: "Jira" } : {}) };
+      }
+      case "jira.issues_created":
+        return { ...base, text: `created ${Array.isArray(d.issues) ? d.issues.length : ""} Jira issues in ${r.target}`, note: Array.isArray(d.issues) ? d.issues.join(", ") : undefined };
+      case "jira.unlinked":
+        return { ...base, text: `unlinked Jira issue ${r.target}` };
       case "channel.added":
         return { ...base, text: `connected the ${d.kind === "teams" ? "Teams" : "Slack"} channel "${r.target}"` };
       case "channel.removed":

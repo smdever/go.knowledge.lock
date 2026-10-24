@@ -26,6 +26,7 @@ import {
 } from "@/lib/app/orgs";
 import { removePasskey } from "@/lib/app/passkeys";
 import { addChannel, checkSlackId, removeChannel, testChannel } from "@/lib/app/channels";
+import { connectJira, disconnectJira, setAutoCheck } from "@/lib/app/jira";
 import { appDb } from "@/lib/app/db";
 import { closeAccessRequest, getAccessRequest, submitAccessRequest } from "@/lib/app/access";
 import { withdrawPasskeySignOffs } from "@/lib/app/records";
@@ -357,4 +358,31 @@ export async function dismissAccessAction(fd: FormData) {
   if (!isAdmin(user.email)) return;
   await closeAccessRequest(user, str(fd, "id"), "dismissed");
   revalidatePath("/app/admin");
+}
+
+// ---------- Jira ----------
+
+export async function connectJiraAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  return attempt(async () => {
+    const { user, current } = await ownerOrg();
+    const { site, accountName } = await connectJira(current.orgId, user, { site: str(fd, "site"), email: str(fd, "email"), token: str(fd, "token") });
+    revalidatePath("/app/integrations");
+    return { message: `Connected to ${site.replace(/^https:\/\//, "")} as ${accountName}.` };
+  });
+}
+
+export async function disconnectJiraAction() {
+  const { user, current } = await ownerOrg();
+  await disconnectJira(current.orgId, user);
+  revalidatePath("/app/integrations");
+}
+
+export async function setJiraAutoCheckAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  return attempt(async () => {
+    const { user, current } = await ownerOrg();
+    const on = str(fd, "auto") === "on";
+    await setAutoCheck(current.orgId, user, on);
+    revalidatePath("/app/integrations");
+    return { message: on ? "Linked issues will be re-checked when they change." : "Automatic checks are off." };
+  });
 }

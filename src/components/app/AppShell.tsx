@@ -64,7 +64,7 @@ export default function AppShell({ ctx, children }: { ctx: AppContext; children:
       label: "Organisation settings",
       links: owner
         ? [
-            { href: "/app/integrations", label: "Slack & Teams" },
+            { href: "/app/integrations", label: "Integrations" },
             { href: "/app/api-keys", label: "API keys" },
           ]
         : [],

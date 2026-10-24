@@ -10,6 +10,7 @@ import { Build, Verify } from "./LockTools";
 import StartButton from "./StartButton";
 import Avatar from "./Avatar";
 import { useKL } from "./KLContext";
+import JiraPanel from "./app/JiraPanel";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://guidedorchestration.com";
 const APP_URL = (process.env.NEXT_PUBLIC_KL_APP_URL || "https://app.knowledge-lock.com").replace(/\/$/, "");
@@ -242,6 +243,18 @@ export default function LockScreens({
           <div className="mt-6">
             <Build lockId={block.lockId} questions={questions} sampleTicket={sampleTicket} />
           </div>
+
+          {product && !isPolicy ? (
+            <div className="mt-10 border-t border-ink/10 pt-8">
+              <h2 className="text-lg font-semibold">Jira</h2>
+              <p className="mt-1 max-w-[60ch] text-[15px] leading-relaxed text-ink/70">
+                Check Jira issues against this record, and create issues from it.
+              </p>
+              <div className="mt-4">
+                <JiraPanel lockId={block.lockId} claimCount={block.payload.claims.length} />
+              </div>
+            </div>
+          ) : null}
 
           <div className="mt-10 border-t border-ink/10 pt-8">
             {!supersededBy && canPropose ? (

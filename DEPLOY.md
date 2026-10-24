@@ -79,7 +79,7 @@ Create a second project from this repo (e.g. `knowledge-lock-app`) and add the d
 | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` | Needed from phase 2 (model review) |
 | `KL_ORG_HOURLY_LIMIT` | Optional. AI calls per organisation per hour (default 300) |
 | `KL_API_HOURLY_LIMIT`, `KL_API_DAILY_LIMIT` | Optional. Agent API requests per key per hour (default 1000) and per organisation per day (default 10000) |
-| `KL_SECRETS_KEY` | Recommended. A long random string (`openssl rand -hex 32`) used to encrypt Slack and Teams webhook links. If unset, a key derived from `KL_AUTHORITY_PRIVATE_KEY` is used. Changing it means owners must reconnect their channels |
+| `KL_SECRETS_KEY` | Recommended. A long random string (`openssl rand -hex 32`) used to encrypt Slack and Teams webhook links and Jira API tokens. If unset, a key derived from `KL_AUTHORITY_PRIVATE_KEY` is used. Changing it means owners must reconnect their channels |
 | `KL_SUPPORT_EMAIL` | Optional. The help address shown in the in-app guide (default `hello@guidedorchestration.com`) |
 
 ### 3. First sign-in
@@ -93,6 +93,9 @@ People add passkeys on **Profile**; owners can require them under **Team**. Pass
 
 ### Slack and Teams
 Owners connect channels under **Slack & Teams** (`/app/integrations`) by pasting a channel webhook link: a Slack Incoming Webhook, or a Teams Workflows "Post to a channel when a webhook request is received" link. Only `hooks.slack.com`, `*.logic.azure.com` and `*.powerplatform.com` over HTTPS are accepted. Links are stored encrypted (`kl_channels`). A channel is paused after 10 failed posts in a row; sending a test from the page starts it again.
+
+### Jira
+Owners connect Jira Cloud under **Integrations** (`/app/integrations`) with a Jira account's email and API token; only `*.atlassian.net` over HTTPS is accepted, and the token is stored encrypted (`kl_jira`). Use a dedicated Jira account with access to the right projects, since comments are posted as it. On a locked record's **Build from it** tab people can check an issue (comment + web link on the issue), create one issue per requirement, and see linked issues (`kl_jira_links`). Automatic checks need a Jira webhook (Settings › System › WebHooks) pointing at the URL shown on the Integrations page, with the secret shown there, for Issue created/updated; requests are verified with `X-Hub-Signature` (HMAC-SHA256). Each check uses one AI call from the organisation's allowance.
 
 ### How records work in the product
 - An owner proposes the organisation's **Policy** first (optional but recommended). Every later record is reviewed against it.

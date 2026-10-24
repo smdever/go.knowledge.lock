@@ -26,6 +26,7 @@ const SECTIONS = [
   ["passkeys", "Signing with a passkey"],
   ["api", "Connecting your own AI agents"],
   ["emails", "Emails you'll get"],
+  ["jira", "Jira"],
   ["slack", "Slack and Teams"],
   ["data", "Your data"],
   ["help", "Getting help"],
@@ -182,9 +183,29 @@ export default async function GuidePage() {
         <li>When a record you&apos;re involved in is locked.</li>
       </ul>
 
+      <H2 id="jira">Jira</H2>
+      <P>
+        An owner connects Jira under <strong>Integrations</strong>, with a Jira account&apos;s email and API token. Then, on any locked
+        record, open <strong>Build from it</strong> to:
+      </P>
+      <ul className="mt-3 list-disc space-y-2 pl-5 text-[15px] leading-relaxed text-ink/80">
+        <li>
+          <strong>Check an issue.</strong> Enter its key, like CLM-42. Knowledge Lock reads the issue, checks it against the record and
+          posts the findings as a comment on the issue. The issue is then linked, and gets a &ldquo;Knowledge Lock&rdquo; web link in Jira.
+        </li>
+        <li>
+          <strong>Create issues.</strong> One Jira issue per requirement, in the project you choose, each linked back to the record.
+        </li>
+        <li>
+          <strong>Automatic checks.</strong> Once the owner adds the webhook in Jira, linked issues are re-checked when their summary or
+          description changes. A comment is only added when the result changes.
+        </li>
+        <li>When a new version of the record is locked, its linked issues move to the new version and are checked against it.</li>
+      </ul>
+
       <H2 id="slack">Slack and Teams</H2>
       <P>
-        Owners can connect Slack or Microsoft Teams channels under <strong>Slack &amp; Teams</strong>. Knowledge Lock then posts there
+        Owners can connect Slack or Microsoft Teams channels under <strong>Integrations</strong>. Knowledge Lock then posts there
         when a sign-off is needed, when someone asks for changes, and when something is locked, with a button back to the record.
         In Teams you&apos;re @mentioned by your work email. In Slack, add your Slack member ID on your <strong>Profile</strong> page to
         be @mentioned.

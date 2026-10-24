@@ -29,7 +29,7 @@ export function Submit({ children, className = "" }: { children: React.ReactNode
   );
 }
 
-function CopyLink({ link }: { link: string }) {
+export function CopyLink({ link }: { link: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="mt-2 flex items-center gap-2 rounded-lg border border-ink/15 p-2">
@@ -515,5 +515,51 @@ export function AccessRequests({
         <p className="mt-3 text-sm text-ink/65">No requests waiting. People can ask for access from the sign-in page.</p>
       )}
     </div>
+  );
+}
+
+export function JiraConnectForm({ action, site, email }: { action: Action; site?: string; email?: string }) {
+  const [state, formAction] = useActionState(action, {});
+  return (
+    <form action={formAction} className="space-y-4">
+      <div>
+        <label htmlFor="jira-site" className="block text-sm font-semibold">Jira site</label>
+        <input id="jira-site" name="site" required defaultValue={site} placeholder="yourcompany.atlassian.net" autoComplete="off" spellCheck={false} className={`mt-2 ${inputClass}`} />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="jira-email" className="block text-sm font-semibold">Jira account email</label>
+          <input id="jira-email" name="email" type="email" required defaultValue={email} autoComplete="off" className={`mt-2 ${inputClass}`} />
+        </div>
+        <div>
+          <label htmlFor="jira-token" className="block text-sm font-semibold">API token</label>
+          <input id="jira-token" name="token" type="password" required autoComplete="off" className={`mt-2 ${inputClass} font-mono`} />
+        </div>
+      </div>
+      <p className="text-xs text-muted">
+        Create a token at id.atlassian.com › Security › API tokens. We recommend a dedicated Jira account (such as
+        &ldquo;Knowledge Lock bot&rdquo;) with access to the projects you&apos;ll link, because comments are posted as that account. The token
+        is stored encrypted.
+      </p>
+      <Submit>{site ? "Update connection" : "Connect Jira"}</Submit>
+      <Result state={state} />
+    </form>
+  );
+}
+
+export function ToggleForm({ action, name, on, label, help }: { action: Action; name: string; on: boolean; label: string; help: string }) {
+  const [state, formAction] = useActionState(action, {});
+  return (
+    <form action={formAction}>
+      <label className="flex items-start gap-3 text-[15px]">
+        <input type="checkbox" name={name} defaultChecked={on} className="mt-1 h-4 w-4 accent-accent" />
+        <span>
+          <span className="font-semibold">{label}</span>
+          <span className="block text-sm text-ink/65">{help}</span>
+        </span>
+      </label>
+      <Submit className="mt-3">Save</Submit>
+      <Result state={state} />
+    </form>
   );
 }
