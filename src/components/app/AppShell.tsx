@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { Lock, LogOut } from "lucide-react";
+import { Lock } from "lucide-react";
 import { signOut, switchOrg } from "@/app/app/actions";
 import type { AppContext } from "@/lib/app/context";
+import { ROLE_LABEL } from "@/lib/app/roles";
+import AppNav, { type NavGroup, type NavLink } from "./AppNav";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://guidedorchestration.com";
 
@@ -16,16 +18,9 @@ export function Brand({ compact = false }: { compact?: boolean }) {
   );
 }
 
-export function LegalFooter({ links = [] }: { links?: { href: string; label: string }[] }) {
+export function LegalFooter() {
   return (
     <footer className="border-t border-ink/10">
-      {links.length ? (
-        <nav aria-label="More" className="mx-auto flex max-w-6xl flex-wrap gap-x-5 gap-y-2 px-4 pt-6 text-sm lg:hidden">
-          {links.map((l) => (
-            <Link key={l.href} href={l.href} className="text-ink/70 hover:text-ink">{l.label}</Link>
-          ))}
-        </nav>
-      ) : null}
       <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-6 text-xs text-muted sm:flex-row sm:justify-between sm:px-6">
         <span>Knowledge Lock by Guided Orchestration Ltd</span>
         <span className="flex gap-4">
@@ -53,72 +48,64 @@ export function PublicShell({ children }: { children: React.ReactNode }) {
 }
 
 export default function AppShell({ ctx, children }: { ctx: AppContext; children: React.ReactNode }) {
-  // `more` links sit in the header on wide screens, and in the footer on phones and tablets.
-  const nav: { href: string; label: string; more?: boolean }[] = [
+  const owner = ctx.current?.role === "owner";
+  const primary: NavLink[] = [
     { href: "/app", label: "Home" },
     ...(ctx.current
       ? [
           { href: "/app/policies", label: "Policy" },
           { href: "/app/team", label: "Team" },
-          ...(ctx.current.role === "owner"
-            ? [
-                { href: "/app/activity", label: "Activity", more: true },
-                { href: "/app/api-keys", label: "API", more: true },
-                { href: "/app/integrations", label: "Slack & Teams", more: true },
-              ]
-            : []),
+          ...(owner ? [{ href: "/app/activity", label: "Activity" }] : []),
         ]
       : []),
-    { href: "/app/guide", label: "Guide", more: true },
-    { href: "/app/profile", label: "Profile", more: true },
-    ...(ctx.admin ? [{ href: "/app/admin", label: "Admin", more: true }] : []),
+  ];
+  const menu: NavGroup[] = [
+    {
+      label: "Organisation settings",
+      links: owner
+        ? [
+            { href: "/app/integrations", label: "Slack & Teams" },
+            { href: "/app/api-keys", label: "API keys" },
+          ]
+        : [],
+    },
+    {
+      label: "You",
+      links: [
+        { href: "/app/profile", label: "Profile and passkeys" },
+        { href: "/app/guide", label: "Guide" },
+      ],
+    },
+    { label: "Guided Orchestration", links: ctx.admin ? [{ href: "/app/admin", label: "Admin" }] : [] },
   ];
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-40 border-b border-ink/10 bg-bg/85 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-          <div className="flex min-w-0 items-center gap-4">
-            <Link href="/app" aria-label="Knowledge Lock home">
-              <Brand compact />
+          <div className="flex min-w-0 items-center gap-3">
+            <Link href="/app" aria-label="Knowledge Lock home" className="shrink-0">
+              <Brand />
             </Link>
-            {ctx.memberships.length > 1 ? (
-              <form action={switchOrg} className="hidden sm:block">
-                <label htmlFor="org-switch" className="sr-only">Organisation</label>
-                <select
-                  id="org-switch"
-                  name="orgId"
-                  defaultValue={ctx.current?.orgId}
-                  className="max-w-[14rem] truncate rounded-lg border border-ink/15 bg-transparent px-2 py-1 text-sm"
-                >
-                  {ctx.memberships.map((m) => (
-                    <option key={m.orgId} value={m.orgId}>{m.orgName}</option>
-                  ))}
-                </select>
-                <button type="submit" className="ml-1 text-xs font-semibold text-steel hover:text-ink">Switch</button>
-              </form>
-            ) : ctx.current ? (
-              <span className="hidden truncate text-sm text-muted sm:inline">{ctx.current.orgName}</span>
+            {ctx.current ? (
+              <span className="hidden min-w-0 items-center gap-3 text-sm text-muted sm:flex">
+                <span aria-hidden="true" className="h-4 w-px bg-ink/15" />
+                <span className="truncate">{ctx.current.orgName}</span>
+              </span>
             ) : null}
           </div>
-          <div className="flex items-center gap-4 text-sm">
-            <nav className="flex items-center gap-3 sm:gap-4">
-              {nav.map((n) => (
-                <Link key={n.href} href={n.href} className={`whitespace-nowrap text-ink/70 hover:text-ink ${n.more ? "hidden lg:inline" : ""}`}>
-                  {n.label}
-                </Link>
-              ))}
-            </nav>
-            <form action={signOut}>
-              <button type="submit" className="inline-flex items-center gap-1 text-ink/60 hover:text-ink" title="Sign out">
-                <LogOut className="h-4 w-4" />
-                <span className="sr-only sm:not-sr-only">Sign out</span>
-              </button>
-            </form>
-          </div>
+          <AppNav
+            primary={primary}
+            menu={menu}
+            user={{ name: ctx.profile?.name || ctx.user.email, email: ctx.user.email }}
+            orgs={ctx.memberships.map((m) => ({ id: m.orgId, name: m.orgName, current: m.orgId === ctx.current?.orgId }))}
+            roleLabel={ctx.current ? ROLE_LABEL[ctx.current.role] : undefined}
+            signOut={signOut}
+            switchOrg={switchOrg}
+          />
         </div>
       </header>
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-12">{children}</main>
-      <LegalFooter links={nav.filter((n) => n.more)} />
+      <LegalFooter />
     </div>
   );
 }
