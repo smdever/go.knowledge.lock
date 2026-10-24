@@ -72,13 +72,14 @@ Create a second project from this repo (e.g. `knowledge-lock-app`) and add the d
 | `KL_APP_URL` | `https://app.knowledge-lock.com` |
 | `DATABASE_URL` | The product's Supabase transaction pooler string |
 | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` | From step 1.2 |
+| `SUPABASE_SECRET_KEY` | Project Settings → API keys → Secret keys. Server-side only. Used to delete someone's sign-in account when they delete their account, or when their organisation is deleted. Without it, admins are emailed to delete it by hand |
 | `KL_ADMIN_EMAILS` | Your email (comma-separate several). Admins can create organisations |
 | `RESEND_API_KEY`, `KL_EMAIL_FROM` | For invite emails, e.g. `Knowledge Lock <no-reply@knowledge-lock.com>` |
 | `KL_AUTHORITY_PRIVATE_KEY`, `KL_AUTHORITY_PUBLIC_KEY` | A new pair for the product: `node scripts/generate-authority-key.mjs` |
 | `NEXT_PUBLIC_SITE_URL` | `https://guidedorchestration.com` |
 | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` | Needed from phase 2 (model review) |
 | `KL_ORG_HOURLY_LIMIT` | Optional. AI calls per organisation per hour (default 300) |
-| `CRON_SECRET` | Any long random string (`openssl rand -base64 32`). Vercel sends it to the daily job in `vercel.json` that emails owners one reminder if nothing is locked three days after they join. Without it, the job does nothing |
+| `CRON_SECRET` | Any long random string (`openssl rand -hex 32`). Vercel sends it to the daily job in `vercel.json` (`/api/cron/daily`), which deletes organisations 30 days after an owner closes them and emails owners one getting-started reminder. Without it, the job does nothing |
 | `KL_API_HOURLY_LIMIT`, `KL_API_DAILY_LIMIT` | Optional. Agent API requests per key per hour (default 1000) and per organisation per day (default 10000) |
 | `KL_SECRETS_KEY` | Recommended. A long random string (`openssl rand -hex 32`) used to encrypt Slack and Teams webhook links and Jira API tokens. If unset, a key derived from `KL_AUTHORITY_PRIVATE_KEY` is used. Changing it means owners must reconnect their channels |
 | `KL_SUPPORT_EMAIL` | Optional. The help address shown in the in-app guide (default `hello@guidedorchestration.com`) |

@@ -65,7 +65,10 @@ export default async function AdminPage() {
             <tbody>
               {orgs.map((o) => (
                 <tr key={o.id} className="border-b border-ink/10">
-                  <td className="py-2.5 font-semibold">{o.name}</td>
+                  <td className="py-2.5 font-semibold">
+                    {o.name}
+                    {o.deleteAfter ? <span className="block text-xs font-normal text-warn">Closing, deleted {fmt(o.deleteAfter)}</span> : null}
+                  </td>
                   <td className="py-2.5">{o.members}</td>
                   <td className="py-2.5">{o.pendingInvites}</td>
                   <td className="py-2.5">{fmt(o.createdAt)}</td>

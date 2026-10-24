@@ -66,14 +66,41 @@ export interface Membership {
   orgId: string;
   orgName: string;
   role: Role;
+  /** Set while an owner's request to close the organisation is waiting out its grace period. */
+  closing: { by: string; deleteAfter: Date } | null;
 }
 
 export async function listMemberships(userId: string): Promise<Membership[]> {
   const db = await appDb();
-  return db<Membership[]>`
-    SELECT m.org_id AS "orgId", o.name AS "orgName", m.role
+  const rows = await db<(Omit<Membership, "closing"> & { closingBy: string | null; deleteAfter: Date | null })[]>`
+    SELECT m.org_id AS "orgId", o.name AS "orgName", m.role, o.closing_by_name AS "closingBy", o.delete_after AS "deleteAfter"
     FROM kl_members m JOIN kl_organisations o ON o.id = m.org_id
     WHERE m.user_id = ${userId} ORDER BY o.name`;
+  return rows.map(({ closingBy, deleteAfter, ...m }) => ({ ...m, closing: deleteAfter ? { by: closingBy ?? "", deleteAfter } : null }));
+}
+
+// ---------- Closing organisations ----------
+
+export const longDate = (d: Date | number) =>
+  new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/London" }).format(d);
+
+/** When a closing organisation will be deleted, or null if it isn't closing. */
+export async function closingDate(orgId: string): Promise<{ name: string; deleteAfter: Date } | null> {
+  const db = await appDb();
+  const [o] = await db<{ name: string; deleteAfter: Date | null }[]>`SELECT name, delete_after AS "deleteAfter" FROM kl_organisations WHERE id = ${orgId}`;
+  return o?.deleteAfter ? { name: o.name, deleteAfter: o.deleteAfter } : null;
+}
+
+export class ClosingError extends AppError {}
+
+/** A closing organisation is read-only: nothing new is created, signed, locked, checked or sent. */
+export async function assertOrgOpen(orgId: string): Promise<void> {
+  const c = await closingDate(orgId);
+  if (c) {
+    throw new ClosingError(
+      `${c.name} is closing, so nothing can be changed. Everything in it will be deleted on ${longDate(c.deleteAfter)}. An owner can cancel the closure on the Team page.`
+    );
+  }
 }
 
 export interface Member {
@@ -101,7 +128,7 @@ async function requireRole(orgId: string, user: AppUser, roles: Role[]): Promise
   return m.role;
 }
 
-async function ownerCount(orgId: string) {
+export async function ownerCount(orgId: string) {
   const db = await appDb();
   const [r] = await db<{ n: number }[]>`SELECT count(*)::int AS n FROM kl_members WHERE org_id = ${orgId} AND role = 'owner'`;
   return r.n;
@@ -109,6 +136,7 @@ async function ownerCount(orgId: string) {
 
 export async function changeRole(orgId: string, actor: AppUser, userId: string, roleRaw: unknown) {
   await requireRole(orgId, actor, ["owner"]);
+  await assertOrgOpen(orgId);
   if (!isRole(roleRaw)) throw new AppError("Choose a role.");
   const db = await appDb();
   const [target] = await db<{ role: Role; email: string }[]>`SELECT role, email FROM kl_members WHERE org_id = ${orgId} AND user_id = ${userId}`;
@@ -132,6 +160,7 @@ export async function removeMember(orgId: string, actor: AppUser, userId: string
 /** Owners can require every sign-off to be signed with the person's own passkey. Applies to records started from now on. */
 export async function setRequirePasskeys(orgId: string, actor: AppUser, on: boolean) {
   await requireRole(orgId, actor, ["owner"]);
+  await assertOrgOpen(orgId);
   const db = await appDb();
   const rows = await db`UPDATE kl_organisations SET require_passkeys = ${on} WHERE id = ${orgId} AND require_passkeys <> ${on} RETURNING id`;
   if (rows.length) await audit(orgId, actor, on ? "org.passkeys_required" : "org.passkeys_optional");
@@ -176,6 +205,7 @@ async function insertInvite(orgId: string, actor: AppUser, email: string, role: 
 
 export async function createInvite(orgId: string, actor: AppUser, emailRaw: unknown, roleRaw: unknown) {
   await requireRole(orgId, actor, ["owner"]);
+  await assertOrgOpen(orgId);
   const email = checkEmail(emailRaw);
   if (!isRole(roleRaw)) throw new AppError("Choose a role.");
   const db = await appDb();
@@ -217,6 +247,7 @@ export async function acceptInvite(token: string, user: AppUser, name: unknown, 
   const invite = await getInvite(token);
   if (!invite) throw new AppError("This invite has expired or has already been used.");
   if (invite.email !== user.email) throw new AppError(`This invite is for ${invite.email}. Sign in with that address to accept it.`);
+  if (await closingDate(invite.orgId)) throw new AppError(`${invite.orgName} is closing, so it isn't accepting new members.`);
   await saveProfile(user, name, title);
   const db = await appDb();
   await db.begin(async (tx) => {
@@ -253,6 +284,7 @@ export interface OrgSummary {
   firstRecordAt: Date | null;
   firstLockAt: Date | null;
   remindedAt: Date | null;
+  deleteAfter: Date | null;
 }
 
 export async function listOrganisations(): Promise<OrgSummary[]> {
@@ -264,7 +296,7 @@ export async function listOrganisations(): Promise<OrgSummary[]> {
       (SELECT min(m.created_at) FROM kl_members m WHERE m.org_id = o.id AND m.role = 'owner') AS "ownerJoinedAt",
       (SELECT min(a.at) FROM kl_audit a WHERE a.org_id = o.id AND a.action = 'record.created') AS "firstRecordAt",
       (SELECT min(a.at) FROM kl_audit a WHERE a.org_id = o.id AND a.action = 'record.locked' AND a.detail->>'kind' = 'requirements') AS "firstLockAt",
-      o.onboarding_reminded_at AS "remindedAt"
+      o.onboarding_reminded_at AS "remindedAt", o.delete_after AS "deleteAfter"
     FROM kl_organisations o ORDER BY o.created_at DESC`;
 }
 

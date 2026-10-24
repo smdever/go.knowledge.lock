@@ -163,7 +163,7 @@ export default async function AppHome() {
   const drafts = records.filter((r) => r.status === "draft" && !r.waitingOnMe && !r.archived);
   const locked = records.filter((r) => r.status === "locked" && !r.superseded && !r.retired);
   const archived = records.filter((r) => r.archived || (r.retired && !r.superseded));
-  const canCreate = org.role !== "viewer";
+  const canCreate = org.role !== "viewer" && !org.closing;
   const onboarding = await getOnboarding(org.orgId, ctx.user.id, org.role);
 
   return (

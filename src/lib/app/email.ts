@@ -70,12 +70,13 @@ export function inviteEmail(p: { orgName: string; inviter: Inviter; role: Role; 
 }
 
 /** A short product notification with one button. */
-export function noticeEmail(p: { subject: string; heading: string; lines: string[]; cta: string; url: string; orgName: string }) {
-  const text = `${p.heading}\n\n${p.lines.join("\n\n")}\n\n${p.cta}: ${p.url}\n\n— Knowledge Lock, ${p.orgName}`;
+export function noticeEmail(p: { subject: string; heading: string; lines: string[]; cta: string; url: string; orgName: string; footer?: string }) {
+  const footer = p.footer ?? `Knowledge Lock, ${p.orgName}. You're getting this because you're part of this organisation on Knowledge Lock.`;
+  const text = `${p.heading}\n\n${p.lines.join("\n\n")}\n\n${p.cta}: ${p.url}\n\n— ${footer}`;
   const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:520px;color:#293241;font-size:15px;line-height:1.6">
   <p style="font-size:17px;font-weight:600;margin:0 0 12px">${esc(p.heading)}</p>
   ${p.lines.map((l) => `<p style="margin:0 0 12px">${esc(l)}</p>`).join("")}
   <p style="margin:20px 0"><a href="${esc(p.url)}" style="display:inline-block;background:#b8442a;color:#fff;text-decoration:none;font-weight:600;padding:10px 18px;border-radius:8px">${esc(p.cta)}</a></p>
-  <p style="color:#5b6b7f;font-size:13px">Knowledge Lock, ${esc(p.orgName)}. You're getting this because you're part of this organisation on Knowledge Lock.</p></div>`;
+  <p style="color:#5b6b7f;font-size:13px">${esc(footer)}</p></div>`;
   return { subject: p.subject, html, text };
 }

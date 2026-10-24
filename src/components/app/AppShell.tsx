@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Lock } from "lucide-react";
+import { AlertTriangle, Lock } from "lucide-react";
 import { signOut, switchOrg } from "@/app/app/actions";
 import type { AppContext } from "@/lib/app/context";
 import { ROLE_LABEL } from "@/lib/app/roles";
+import { longDate } from "@/lib/app/orgs";
 import AppNav, { type NavGroup, type NavLink } from "./AppNav";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://guidedorchestration.com";
@@ -104,6 +105,22 @@ export default function AppShell({ ctx, children }: { ctx: AppContext; children:
           />
         </div>
       </header>
+      {ctx.current?.closing ? (
+        <div role="status" className="border-b border-warn/50 bg-surface">
+          <p className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-2 gap-y-1 px-4 py-2.5 text-sm sm:px-6">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-warn" />
+            <span className="font-semibold text-warn">{ctx.current.orgName} is closing.</span>
+            <span className="text-ink/80">
+              It&apos;s read-only, and everything in it will be deleted on {longDate(ctx.current.closing.deleteAfter)}.
+            </span>
+            {owner ? (
+              <Link href="/app/team#close" className="font-semibold text-steel underline hover:text-ink">
+                Download or cancel
+              </Link>
+            ) : null}
+          </p>
+        </div>
+      ) : null}
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-12">{children}</main>
       <LegalFooter />
     </div>

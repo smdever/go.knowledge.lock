@@ -31,6 +31,8 @@ import { appDb } from "@/lib/app/db";
 import { closeAccessRequest, getAccessRequest, submitAccessRequest } from "@/lib/app/access";
 import { withdrawPasskeySignOffs } from "@/lib/app/records";
 import { dismissOnboarding } from "@/lib/app/onboarding";
+import { deleteAccount, leaveOrganisation } from "@/lib/app/account";
+import { cancelClosure, closeOrganisation } from "@/lib/app/closure";
 
 export interface FormState {
   error?: string;
@@ -392,4 +394,45 @@ export async function dismissOnboardingAction() {
   const { user, current } = await ownerOrg();
   await dismissOnboarding(current.orgId, user);
   revalidatePath("/app");
+}
+
+// ---------- Your data, leaving and closing ----------
+
+export async function leaveOrgAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  return attempt(async () => {
+    const { user } = await getContext("/app/profile");
+    await leaveOrganisation(str(fd, "orgId"), user);
+    (await cookies()).delete(ORG_COOKIE);
+    redirect("/app");
+  });
+}
+
+export async function deleteAccountAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  return attempt(async () => {
+    const { user } = await getContext("/app/profile");
+    await deleteAccount(user, str(fd, "confirm"));
+    const store = await cookies();
+    store.delete(DEV_COOKIE);
+    store.delete(ORG_COOKIE);
+    if (supabaseConfig()) await (await supabaseServer()).auth.signOut().catch(() => {});
+    redirect("/signin?deleted=1");
+  });
+}
+
+export async function closeOrgAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  return attempt(async () => {
+    const { user, current } = await ownerOrg();
+    await closeOrganisation(current.orgId, user, str(fd, "confirm"));
+    revalidatePath("/app", "layout");
+    return { message: "Closing." };
+  });
+}
+
+export async function cancelClosureAction(_prev: FormState): Promise<FormState> {
+  return attempt(async () => {
+    const { user, current } = await ownerOrg();
+    await cancelClosure(current.orgId, user);
+    revalidatePath("/app", "layout");
+    return { message: "Cancelled." };
+  });
 }

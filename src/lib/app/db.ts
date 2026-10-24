@@ -1,7 +1,7 @@
 import { databaseUrl, ensureSchema, markSchema, schemaIsCurrent, sql } from "@/lib/demo/store/postgres";
 
 /** Bump when the statements below change (see schemaIsCurrent). */
-const APP_SCHEMA_VERSION = 8;
+const APP_SCHEMA_VERSION = 9;
 
 const g = globalThis as unknown as { __klAppSchema?: Promise<void> };
 
@@ -209,6 +209,11 @@ export async function appDb() {
       // Getting started: when an owner hid the checklist, and when the one reminder email went.
       await db`ALTER TABLE kl_organisations ADD COLUMN IF NOT EXISTS onboarding_dismissed_at timestamptz`;
       await db`ALTER TABLE kl_organisations ADD COLUMN IF NOT EXISTS onboarding_reminded_at timestamptz`;
+      // Closing an organisation: who asked, and when everything in it will be deleted.
+      await db`ALTER TABLE kl_organisations ADD COLUMN IF NOT EXISTS closing_at timestamptz`;
+      await db`ALTER TABLE kl_organisations ADD COLUMN IF NOT EXISTS closing_by text`;
+      await db`ALTER TABLE kl_organisations ADD COLUMN IF NOT EXISTS closing_by_name text`;
+      await db`ALTER TABLE kl_organisations ADD COLUMN IF NOT EXISTS delete_after timestamptz`;
       await db`CREATE INDEX IF NOT EXISTS kl_members_user ON kl_members (user_id)`;
       await db`CREATE INDEX IF NOT EXISTS kl_invites_org ON kl_invites (org_id)`;
       await db`CREATE INDEX IF NOT EXISTS kl_audit_org ON kl_audit (org_id, at)`;

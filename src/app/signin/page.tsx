@@ -13,6 +13,11 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   if (await getUser()) redirect(next);
   return (
     <PublicShell>
+      {sp.deleted ? (
+        <p role="status" className="mb-6 rounded-lg border border-good/50 bg-surface px-3 py-2.5 text-sm text-ink/80">
+          Your account has been deleted. We&apos;ve emailed you a confirmation.
+        </p>
+      ) : null}
       {sp.error === "link" ? (
         <p role="alert" className="mb-6 rounded-lg border border-bad/30 bg-surface px-3 py-2.5 text-sm text-bad">
           That sign-in link has expired or was already used. Request a new one below.

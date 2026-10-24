@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { seal, unseal } from "./secrets";
 import type { AppUser } from "./auth";
 import { appDb } from "./db";
-import { AppError, audit } from "./orgs";
+import { AppError, assertOrgOpen, audit } from "./orgs";
 import { appUrl } from "@/lib/mode";
 
 /**
@@ -92,6 +92,7 @@ export async function addChannel(
   input: { kind?: unknown; name?: unknown; url?: unknown; events?: unknown }
 ): Promise<ChannelSummary> {
   await requireOwner(orgId, user);
+  await assertOrgOpen(orgId);
   const kind: ChannelKind = input.kind === "teams" ? "teams" : "slack";
   const name = typeof input.name === "string" ? input.name.trim().slice(0, 60) : "";
   if (!name) throw new AppError("Give the channel a name, such as #delivery-signoffs.");
@@ -119,6 +120,7 @@ export async function removeChannel(orgId: string, user: AppUser, id: string): P
 /** Sends a test notice and, if it works, un-pauses the channel. */
 export async function testChannel(orgId: string, user: AppUser, id: string, orgName: string): Promise<{ ok: boolean; error?: string }> {
   await requireOwner(orgId, user);
+  await assertOrgOpen(orgId);
   const db = await appDb();
   const [row] = await db<{ id: string; kind: ChannelKind; urlSealed: string }[]>`
     SELECT id, kind, url_sealed AS "urlSealed" FROM kl_channels WHERE id = ${id} AND org_id = ${orgId} AND removed_at IS NULL`;
@@ -236,8 +238,8 @@ export async function postToChannels(orgId: string, event: ChannelEvent, notice:
   try {
     const db = await appDb();
     const rows = await db<{ id: string; kind: ChannelKind; urlSealed: string }[]>`
-      SELECT id, kind, url_sealed AS "urlSealed" FROM kl_channels
-      WHERE org_id = ${orgId} AND removed_at IS NULL AND paused_at IS NULL AND ${event} = ANY(events)`;
+      SELECT c.id, c.kind, c.url_sealed AS "urlSealed" FROM kl_channels c JOIN kl_organisations o ON o.id = c.org_id
+      WHERE c.org_id = ${orgId} AND c.removed_at IS NULL AND c.paused_at IS NULL AND ${event} = ANY(c.events) AND o.closing_at IS NULL`;
     if (!rows.length) return;
     // People's Slack member IDs, for real @mentions.
     const emails = notice.people.map((p) => p.email);

@@ -564,3 +564,135 @@ export function ToggleForm({ action, name, on, label, help }: { action: Action; 
     </form>
   );
 }
+
+// ---------- Your data, leaving and closing ----------
+
+function DangerSubmit({ children, disabled }: { children: React.ReactNode; disabled?: boolean }) {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending || disabled}
+      className="inline-flex items-center gap-2 rounded-lg bg-bad px-4 py-2 text-sm font-semibold text-bg hover:opacity-90 disabled:opacity-50"
+    >
+      {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+      {children}
+    </button>
+  );
+}
+
+export function LeaveOrgForm({ action, orgId, orgName }: { action: Action; orgId: string; orgName: string }) {
+  const [state, formAction] = useActionState(action, {});
+  const [confirming, setConfirming] = useState(false);
+  return (
+    <form action={formAction} className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+      <input type="hidden" name="orgId" value={orgId} />
+      {confirming ? (
+        <>
+          <button type="submit" className="text-sm font-semibold text-bad hover:underline">Leave {orgName}?</button>
+          <button type="button" onClick={() => setConfirming(false)} className="text-sm text-ink/70 hover:text-ink">Cancel</button>
+        </>
+      ) : (
+        <button type="button" onClick={() => setConfirming(true)} className="text-sm font-semibold text-steel hover:text-ink">Leave</button>
+      )}
+      {state.error ? <span role="alert" className="basis-full text-right text-sm font-semibold text-bad">{state.error}</span> : null}
+    </form>
+  );
+}
+
+/** Typing a value (an email or organisation name) to confirm something that can't be undone. */
+function TypeToConfirm({
+  action,
+  expected,
+  label,
+  button,
+  extra,
+}: {
+  action: Action;
+  expected: string;
+  label: React.ReactNode;
+  button: string;
+  extra?: React.ReactNode;
+}) {
+  const [state, formAction] = useActionState(action, {});
+  const [value, setValue] = useState("");
+  const [open, setOpen] = useState(false);
+  if (!open)
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center rounded-lg border border-bad/50 px-4 py-2 text-sm font-semibold text-bad hover:border-bad"
+      >
+        {button}
+      </button>
+    );
+  return (
+    <form action={formAction} className="max-w-md rounded-xl border border-bad/40 bg-surface p-4">
+      {extra}
+      <label htmlFor="confirm-value" className="block text-sm font-semibold">{label}</label>
+      <input
+        id="confirm-value"
+        name="confirm"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        autoComplete="off"
+        spellCheck={false}
+        className={`mt-2 ${inputClass}`}
+      />
+      {state.error ? <p role="alert" className="mt-2 text-sm font-semibold text-bad">{state.error}</p> : null}
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <DangerSubmit disabled={value.trim().toLowerCase() !== expected.trim().toLowerCase()}>{button}</DangerSubmit>
+        <button type="button" onClick={() => setOpen(false)} className="px-2 py-2 text-sm font-semibold text-steel hover:text-ink">
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+export function DeleteAccountForm({ action, email }: { action: Action; email: string }) {
+  return (
+    <TypeToConfirm
+      action={action}
+      expected={email}
+      button="Delete my account"
+      label={
+        <>
+          Type your email address, <span className="font-mono">{email}</span>, to confirm
+        </>
+      }
+    />
+  );
+}
+
+export function CloseOrgForm({ action, orgName, days }: { action: Action; orgName: string; days: number }) {
+  return (
+    <TypeToConfirm
+      action={action}
+      expected={orgName}
+      button={`Close ${orgName}`}
+      extra={
+        <p className="mb-3 text-sm leading-relaxed text-ink/80">
+          Everyone in {orgName} will be emailed. It becomes read-only straight away, and in {days} days everything in it is
+          permanently deleted. Any owner can cancel before then.
+        </p>
+      }
+      label={
+        <>
+          Type the organisation&apos;s name, <strong>{orgName}</strong>, to confirm
+        </>
+      }
+    />
+  );
+}
+
+export function CancelClosureForm({ action }: { action: (prev: FormState) => Promise<FormState> }) {
+  const [state, formAction] = useActionState(action, {});
+  return (
+    <form action={formAction}>
+      <Submit>Cancel the closure</Submit>
+      {state.error ? <p role="alert" className="mt-2 text-sm font-semibold text-bad">{state.error}</p> : null}
+    </form>
+  );
+}

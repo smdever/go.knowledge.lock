@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { AppUser } from "./auth";
 import { appDb } from "./db";
-import { AppError, audit } from "./orgs";
+import { AppError, assertOrgOpen, audit } from "./orgs";
 
 /**
  * API keys let an organisation's own systems and AI agents read its locked records.
@@ -35,6 +35,7 @@ export async function listApiKeys(orgId: string): Promise<ApiKeySummary[]> {
 
 export async function createApiKey(orgId: string, user: AppUser, nameRaw: unknown): Promise<{ key: string; name: string }> {
   await requireOwner(orgId, user);
+  await assertOrgOpen(orgId);
   const name = typeof nameRaw === "string" ? nameRaw.trim().slice(0, 60) : "";
   if (!name) throw new AppError("Give the key a name, such as the agent or system that will use it.");
   const db = await appDb();

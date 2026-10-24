@@ -91,6 +91,16 @@ export async function listActivity(orgId: string, limit = 200): Promise<Activity
         return { ...base, actor: `API key "${String(d.key ?? "")}"`, text: "exported all locked records" };
       case "org.onboarding_reminder":
         return { ...base, actor: "Knowledge Lock", text: d.draft ? "emailed the owners a reminder to finish their first record" : "emailed the owners a reminder to start their first record" };
+      case "member.left":
+        return { ...base, text: d.accountDeleted ? "deleted their account and left" : "left the organisation" };
+      case "org.closing":
+        return {
+          ...base,
+          text: "asked to close the organisation",
+          note: typeof d.deleteAfter === "string" ? `Everything will be deleted on ${new Intl.DateTimeFormat("en-GB", { dateStyle: "long", timeZone: "Europe/London" }).format(new Date(d.deleteAfter))}.` : undefined,
+        };
+      case "org.closure_cancelled":
+        return { ...base, text: "cancelled the closure, so nothing will be deleted" };
       case "record.created":
         return { ...base, text: `created ${record}${v}`, href: recordHref };
       case "record.reviewed":

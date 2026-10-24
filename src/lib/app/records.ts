@@ -45,7 +45,7 @@ import type { AppUser } from "./auth";
 import { appDb } from "./db";
 import { noticeEmail, sendEmail } from "./email";
 import { appUrl } from "@/lib/mode";
-import { AppError, audit, getProfile } from "./orgs";
+import { AppError, assertOrgOpen, audit, getProfile } from "./orgs";
 import { postToChannels } from "./channels";
 import { certify, hasPasskey, signingRequest, SIGN_WINDOW_MS, verifySigning } from "./passkeys";
 import type { Role } from "./roles";
@@ -129,6 +129,7 @@ export async function recordFor(user: AppUser, id: string, need: "read" | "edit"
   const role = record ? await memberRole(record.orgId, user.id) : null;
   if (!record || !role) throw new DemoError("Record not found.", 404);
   if (need === "edit" && role === "viewer") throw new DemoError("Viewers can read records but not change them.", 403);
+  if (need === "edit") await assertOrgOpen(record.orgId);
   return { record, role };
 }
 
@@ -381,6 +382,7 @@ export async function createRecord(
   const role = await memberRole(orgId, user.id);
   if (!role) throw new DemoError("You're not in this organisation.", 403);
   if (role === "viewer") throw new DemoError("Viewers can't create records.", 403);
+  await assertOrgOpen(orgId);
   const org = await getOrg(orgId);
   const now = Date.now();
   const base = {
@@ -563,6 +565,7 @@ interface SignOffInput {
 /** Checks the person may sign this record, and builds their sign-off for the current wording. */
 async function draftSignOff(user: AppUser, record: AppRecord, input: SignOffInput, timestamp: number) {
   assertDraft(record);
+  await assertOrgOpen(record.orgId);
   const signer = record.signers.find((s) => s.userId === user.id);
   if (!signer) throw new DemoError("You're not one of the signers for this record.", 403);
   if (!(await eligibleSigners(record.orgId)).some((s) => s.userId === user.id)) {
@@ -795,6 +798,7 @@ async function usableOrgLock(orgId: string, lockId: string) {
   if (!check.valid) throw new DemoError("This record failed verification, so the agent will not use it.", 409);
   const retired = await retiredFor(lockId);
   if (retired) throw new DemoError(retiredMessage(retired), 410);
+  await assertOrgOpen(orgId);
   const org = await getOrg(orgId);
   const policy = await policyClaimsFor(orgId, lock.block.payload.metadata?.policyLockId as string | undefined);
   return { orgId, org, block: lock.block, policy };
@@ -915,6 +919,7 @@ async function ownerLock(user: AppUser, lockId: string) {
   const record = lock ? await loadRecord(lock.recordId) : null;
   if (!orgId || !lock || !record) throw new DemoError("Locked record not found.", 404);
   if ((await memberRole(orgId, user.id)) !== "owner") throw new DemoError("Only owners can retire or restore a locked record.", 403);
+  await assertOrgOpen(orgId);
   return { orgId, lock, record, org: await getOrg(orgId) };
 }
 

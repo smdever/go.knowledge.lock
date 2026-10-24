@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { chargeUsage, DemoError } from "@/lib/demo/service";
 import { keyFromRequest } from "./apikeys";
-import { audit, AppError } from "./orgs";
+import { audit, AppError, closingDate, longDate } from "./orgs";
 import { appUrl } from "@/lib/mode";
 
 export interface ApiCaller {
@@ -20,6 +20,13 @@ export async function apiHandle<T>(request: Request, fn: (caller: ApiCaller) => 
     return NextResponse.json(
       { error: "Missing or invalid API key. Send it as: Authorization: Bearer kl_live_…" },
       { status: 401, headers: { "WWW-Authenticate": "Bearer" } }
+    );
+  }
+  const closing = await closingDate(caller.orgId);
+  if (closing) {
+    return NextResponse.json(
+      { error: `${closing.name} is closing on Knowledge Lock, so the API is switched off. Everything will be deleted on ${longDate(closing.deleteAfter)}.` },
+      { status: 403 }
     );
   }
   try {

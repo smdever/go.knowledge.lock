@@ -4,7 +4,7 @@ import { postgresStore } from "@/lib/demo/store/postgres";
 import { appUrl } from "@/lib/mode";
 import type { AppUser } from "./auth";
 import { appDb } from "./db";
-import { AppError, audit } from "./orgs";
+import { AppError, assertOrgOpen, audit, closingDate } from "./orgs";
 import { checkOrgDrift, currentRetirement, memberRole, orgLock, retiredFor, retiredMessage, type Retirement } from "./records";
 import { seal, unseal } from "./secrets";
 
@@ -118,6 +118,7 @@ async function requireEditor(orgId: string, user: AppUser) {
 
 export async function connectJira(orgId: string, user: AppUser, input: { site?: unknown; email?: unknown; token?: unknown }) {
   await requireOwner(orgId, user);
+  await assertOrgOpen(orgId);
   const site = checkSite(input.site);
   const email = typeof input.email === "string" ? input.email.trim().slice(0, 254) : "";
   const token = typeof input.token === "string" ? input.token.trim() : "";
@@ -490,6 +491,7 @@ async function runCheck(
 }
 
 async function connectionFor(orgId: string): Promise<JiraConnection> {
+  await assertOrgOpen(orgId);
   const conn = await getConnection(orgId);
   if (!conn) throw new DemoError("Jira isn't connected. An owner can connect it on the Integrations page.", 409);
   return conn;
@@ -716,6 +718,7 @@ interface WebhookPayload {
 export async function acceptWebhook(orgId: string, rawBody: string, signature: string | null): Promise<(() => Promise<void>) | null> {
   const conn = await getConnection(orgId);
   if (!conn || !verifySignature(conn.webhookSecret, rawBody, signature)) throw new DemoError("Signature check failed.", 401);
+  if (await closingDate(orgId)) return null;
   const db = await appDb();
   await db`UPDATE kl_jira SET last_webhook_at = now() WHERE org_id = ${orgId}`;
   let payload: WebhookPayload;

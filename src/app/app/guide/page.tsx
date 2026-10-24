@@ -26,6 +26,7 @@ const SECTIONS = [
   ["use", "Using a locked record"],
   ["passkeys", "Signing with a passkey"],
   ["api", "Connecting your own AI agents"],
+  ["leaving", "Downloading, leaving and closing"],
   ["emails", "Emails you'll get"],
   ["jira", "Jira"],
   ["slack", "Slack and Teams"],
@@ -199,6 +200,25 @@ export default async function GuidePage() {
         .
       </P>
 
+      <H2 id="leaving">Downloading, leaving and closing</H2>
+      <ul className="mt-3 list-disc space-y-2 pl-5 text-[15px] leading-relaxed text-ink/80">
+        <li>
+          <strong>Download my data</strong> on your Profile page gives you everything we hold about you, as a file: your profile,
+          organisations, passkeys, sign-offs, comments and activity.
+        </li>
+        <li>
+          <strong>Leave</strong> an organisation, or <strong>delete your account</strong>, from your Profile page. Deleting removes your
+          profile, passkeys and sign-in account straight away. Records your organisations have locked keep your sign-offs, because
+          those records belong to them.
+        </li>
+        <li>The only owner of an organisation has to make someone else an owner, or close it, before leaving.</li>
+        <li>
+          Owners can <strong>download everything</strong> in their organisation, and <strong>close</strong> it, on the Team page.
+          Closing makes it read-only and switches off the API, Jira and Slack or Teams. After 30 days, everything in it is
+          permanently deleted, locked records and the activity log included. Any owner can cancel until then.
+        </li>
+      </ul>
+
       <H2 id="emails">Emails you&apos;ll get</H2>
       <ul className="mt-3 list-disc space-y-2 pl-5 text-[15px] leading-relaxed text-ink/80">
         <li>A sign-in link each time you sign in. There are no passwords.</li>
@@ -244,7 +264,7 @@ export default async function GuidePage() {
           During the pilot, please don&apos;t enter customers&apos; personal data, health or other sensitive personal information,
           passwords or secrets.
         </li>
-        <li>Locked records and the activity log can&apos;t be edited. At the end of the pilot we can delete your organisation&apos;s data on request.</li>
+        <li>Locked records and the activity log can&apos;t be edited. When an owner closes the organisation, everything is deleted after 30 days.</li>
         <li>
           See the <a href={`${SITE_URL}/privacy`} className="text-steel underline hover:text-ink">privacy notice</a> and{" "}
           <a href={`${SITE_URL}/terms`} className="text-steel underline hover:text-ink">terms</a>.

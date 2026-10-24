@@ -32,7 +32,8 @@ function readDevSession(value: string | undefined): AppUser | null {
 
 /**
  * Accepts the names Supabase's own guides and the Vercel integration use, as well as our own.
- * The publishable (anon) key is safe to expose; the secret/service-role key is never needed.
+ * The publishable (anon) key is safe to expose. The secret key is only used on the server, to delete sign-in
+ * accounts when someone deletes their account (see deleteSignInAccount).
  */
 export function supabaseConfig() {
   const env = process.env;
@@ -90,4 +91,22 @@ export async function requireUser(next = "/app"): Promise<AppUser> {
 /** Only allow redirects back into the product. */
 export function safeNext(next: unknown, fallback = "/app"): string {
   return typeof next === "string" && next.startsWith("/") && !next.startsWith("//") ? next : fallback;
+}
+
+/**
+ * Deletes someone's Supabase sign-in account. Needs SUPABASE_SECRET_KEY (server-side only, never sent to
+ * the browser). Returns false when it can't, so the caller can ask for it to be done by hand.
+ */
+export async function deleteSignInAccount(userId: string): Promise<boolean> {
+  const config = supabaseConfig();
+  const secret = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!config || !secret || userId.startsWith("dev_")) return false;
+  const { createClient } = await import("@supabase/supabase-js");
+  const admin = createClient(config.url, secret, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { error } = await admin.auth.admin.deleteUser(userId);
+  if (error && error.status !== 404) {
+    console.error("[knowledge-lock] couldn't delete sign-in account", error.message);
+    return false;
+  }
+  return true;
 }

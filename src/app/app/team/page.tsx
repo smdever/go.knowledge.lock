@@ -1,9 +1,19 @@
 import { redirect } from "next/navigation";
 import Avatar from "@/components/Avatar";
-import { InviteForm, RemoveForm, RequirePasskeysForm, RoleForm } from "@/components/app/forms";
-import { changeRoleAction, inviteAction, removeMemberAction, revokeInviteAction, setRequirePasskeysAction } from "@/app/app/actions";
+import { Download } from "lucide-react";
+import { CancelClosureForm, CloseOrgForm, InviteForm, RemoveForm, RequirePasskeysForm, RoleForm } from "@/components/app/forms";
+import {
+  cancelClosureAction,
+  changeRoleAction,
+  closeOrgAction,
+  inviteAction,
+  removeMemberAction,
+  revokeInviteAction,
+  setRequirePasskeysAction,
+} from "@/app/app/actions";
+import { GRACE_DAYS } from "@/lib/app/closure";
 import { getContext } from "@/lib/app/context";
-import { listInvites, listMembers, requiresPasskeys } from "@/lib/app/orgs";
+import { listInvites, listMembers, longDate, requiresPasskeys } from "@/lib/app/orgs";
 import { usersWithPasskeys } from "@/lib/app/passkeys";
 import { ROLE_HELP, ROLE_LABEL, ROLES } from "@/lib/app/roles";
 
@@ -14,6 +24,7 @@ export default async function TeamPage() {
   if (!ctx.current) redirect("/app");
   const org = ctx.current;
   const owner = org.role === "owner";
+  const closing = org.closing;
   const [members, invites, required] = await Promise.all([listMembers(org.orgId), listInvites(org.orgId), requiresPasskeys(org.orgId)]);
   const withKeys = await usersWithPasskeys(members.map((m) => m.userId));
 
@@ -22,7 +33,7 @@ export default async function TeamPage() {
       <p className="text-sm font-semibold text-accent">{org.orgName}</p>
       <h1 className="mt-2 text-3xl font-semibold tracking-tight">Team</h1>
 
-      {owner ? (
+      {owner && !closing ? (
         <section className="mt-8">
           <h2 className="text-lg font-semibold">Invite someone</h2>
           <p className="mt-1 text-sm text-ink/70">They&apos;ll get an email with a link that works for 7 days.</p>
@@ -85,7 +96,7 @@ export default async function TeamPage() {
         </section>
       ) : null}
 
-      {owner ? (
+      {owner && !closing ? (
         <section className="mt-10">
           <h2 className="text-lg font-semibold">Personal signatures</h2>
           <p className="mt-1 max-w-2xl text-sm text-ink/70">
@@ -95,6 +106,52 @@ export default async function TeamPage() {
           <div className="mt-4 max-w-2xl">
             <RequirePasskeysForm action={setRequirePasskeysAction} on={required} />
           </div>
+        </section>
+      ) : null}
+
+      {owner ? (
+        <section className="mt-10" id="data">
+          <h2 className="text-lg font-semibold">Download everything</h2>
+          <p className="mt-1 max-w-2xl text-sm text-ink/70">
+            Every locked record with its signatures and verification result, every draft, the people here and the full activity
+            log, as a JSON file. Locked records can be re-checked without us.
+          </p>
+          <a
+            href={`/api/app/org/export?org=${org.orgId}`}
+            download
+            className="mt-4 inline-flex items-center gap-2 rounded-lg border border-ink/20 px-4 py-2 text-sm font-semibold hover:border-ink/40"
+          >
+            <Download className="h-4 w-4" /> Download everything
+          </a>
+        </section>
+      ) : null}
+
+      {owner ? (
+        <section className="mt-10" id="close">
+          {closing ? (
+            <>
+              <h2 className="text-lg font-semibold">{org.orgName} is closing</h2>
+              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-ink/70">
+                {closing.by} asked to close it. On {longDate(closing.deleteAfter)}, everything in it will be permanently deleted,
+                including locked records and the activity log. Download everything first if you need to keep it.
+              </p>
+              <div className="mt-4">
+                <CancelClosureForm action={cancelClosureAction} />
+              </div>
+            </>
+          ) : (
+            <>
+              <h2 className="text-lg font-semibold">Close the organisation</h2>
+              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-ink/70">
+                Closing makes {org.orgName} read-only straight away and switches off the API, Jira and Slack or Teams. After{" "}
+                {GRACE_DAYS} days, everything in it is permanently deleted, including locked records and the activity log, along with
+                the accounts of people who aren&apos;t in another organisation. Any owner can cancel until then.
+              </p>
+              <div className="mt-4">
+                <CloseOrgForm action={closeOrgAction} orgName={org.orgName} days={GRACE_DAYS} />
+              </div>
+            </>
+          )}
         </section>
       ) : null}
 

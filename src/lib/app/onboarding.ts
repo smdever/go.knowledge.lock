@@ -57,7 +57,7 @@ async function facts(orgId: string, userId: string): Promise<Facts> {
         WHERE a.org_id = o.id AND a.action = 'record.reviewed' AND r.kind = 'requirements'
       ) AS reviewed,
       EXISTS (SELECT 1 FROM kl_app_records r WHERE r.org_id = o.id AND r.kind = 'requirements' AND r.status = 'locked') AS locked,
-      (o.onboarding_dismissed_at IS NOT NULL) AS dismissed
+      (o.onboarding_dismissed_at IS NOT NULL OR o.closing_at IS NOT NULL) AS dismissed
     FROM kl_organisations o WHERE o.id = ${orgId}`;
   return f;
 }
@@ -140,7 +140,7 @@ export async function sendOnboardingReminders(now = new Date()): Promise<number>
   const due = await db<{ id: string; name: string; joined: Date }[]>`
     SELECT o.id, o.name, min(m.created_at) AS joined
     FROM kl_organisations o JOIN kl_members m ON m.org_id = o.id AND m.role = 'owner'
-    WHERE o.onboarding_reminded_at IS NULL AND o.onboarding_dismissed_at IS NULL
+    WHERE o.onboarding_reminded_at IS NULL AND o.onboarding_dismissed_at IS NULL AND o.closing_at IS NULL
       AND NOT EXISTS (SELECT 1 FROM kl_app_records r WHERE r.org_id = o.id AND r.kind = 'requirements' AND r.status = 'locked')
     GROUP BY o.id, o.name
     HAVING min(m.created_at) <= ${now}::timestamptz - make_interval(days => ${REMIND_AFTER_DAYS})
