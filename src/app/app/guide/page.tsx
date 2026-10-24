@@ -22,6 +22,7 @@ const SECTIONS = [
   ["flow", "From draft to locked"],
   ["ai", "What the AI reviewers do"],
   ["change", "Changing a locked record"],
+  ["archive", "Archiving and retiring"],
   ["use", "Using a locked record"],
   ["passkeys", "Signing with a passkey"],
   ["api", "Connecting your own AI agents"],
@@ -136,6 +137,22 @@ export default async function GuidePage() {
         version, which stays visible and is marked as replaced.
       </P>
 
+      <H2 id="archive">Archiving and retiring</H2>
+      <ul className="mt-3 list-disc space-y-2 pl-5 text-[15px] leading-relaxed text-ink/80">
+        <li>
+          <strong>Archive a draft</strong> you no longer need. Its creator or an owner can archive it from the top of the draft. It moves
+          to <strong>Archived</strong> on the home page, and nothing can be reviewed, signed or locked until it&apos;s restored.
+        </li>
+        <li>
+          <strong>Retire a locked record</strong> that&apos;s no longer the source of truth. Only owners can, from{" "}
+          <strong>Build from it</strong>, and they give a reason. The lock never changes and still verifies, but the agent, Jira checks
+          and the API stop using it, and everyone who opens it sees who retired it, when and why. Retiring covers every version of the
+          record. Any draft of a next version is archived with it.
+        </li>
+        <li>The policy can&apos;t be retired. Propose a new version of it instead.</li>
+        <li>An owner can restore a retired record, and it&apos;s the signed-off version again.</li>
+      </ul>
+
       <H2 id="use">Using a locked record</H2>
       <ul className="mt-3 list-disc space-y-2 pl-5 text-[15px] leading-relaxed text-ink/80">
         <li>
@@ -180,7 +197,7 @@ export default async function GuidePage() {
         <li>A sign-in link each time you sign in. There are no passwords.</li>
         <li>When your sign-off is needed, once the AI reviewers have approved the wording.</li>
         <li>When someone asks for changes to a record you created or are signing.</li>
-        <li>When a record you&apos;re involved in is locked.</li>
+        <li>When a record you&apos;re involved in is locked, retired or restored.</li>
       </ul>
 
       <H2 id="jira">Jira</H2>
@@ -201,12 +218,13 @@ export default async function GuidePage() {
           description changes. A comment is only added when the result changes.
         </li>
         <li>When a new version of the record is locked, its linked issues move to the new version and are checked against it.</li>
+        <li>When the record is retired, its linked issues get a comment saying so, and they&apos;re no longer checked against it.</li>
       </ul>
 
       <H2 id="slack">Slack and Teams</H2>
       <P>
         Owners can connect Slack or Microsoft Teams channels under <strong>Integrations</strong>. Knowledge Lock then posts there
-        when a sign-off is needed, when someone asks for changes, and when something is locked, with a button back to the record.
+        when a sign-off is needed, when someone asks for changes, when something is locked, and when a record is retired, with a button back to the record.
         In Teams you&apos;re @mentioned by your work email. In Slack, add your Slack member ID on your <strong>Profile</strong> page to
         be @mentioned.
       </P>

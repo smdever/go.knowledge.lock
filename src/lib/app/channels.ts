@@ -11,12 +11,13 @@ import { appUrl } from "@/lib/mode";
  * so they're stored encrypted and only ever shown as a hint.
  */
 export type ChannelKind = "slack" | "teams";
-export const CHANNEL_EVENTS = ["signoff_needed", "changes_requested", "locked"] as const;
+export const CHANNEL_EVENTS = ["signoff_needed", "changes_requested", "locked", "retired"] as const;
 export type ChannelEvent = (typeof CHANNEL_EVENTS)[number];
 export const EVENT_LABEL: Record<ChannelEvent, string> = {
   signoff_needed: "Sign-off needed",
   changes_requested: "Changes requested",
   locked: "Locked",
+  retired: "Retired",
 };
 const MAX_CHANNELS = 5;
 /** After this many failed posts in a row, a channel is paused until an owner tests it again. */

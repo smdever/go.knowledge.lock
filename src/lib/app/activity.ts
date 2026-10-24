@@ -104,6 +104,19 @@ export async function listActivity(orgId: string, limit = 200): Promise<Activity
         return { ...base, text: `asked for changes to ${record}${v}${d.passkey ? ", signed with their passkey" : ""}`, note: d.comment ? `"${d.comment}"` : undefined, href: recordHref };
       case "record.locked":
         return { ...base, text: `locked ${record}${v}`, href: typeof d.lockId === "string" ? `/app/l/${d.lockId}` : recordHref };
+      case "record.archived":
+        return { ...base, text: `archived the draft ${record}${v}`, href: recordHref };
+      case "record.unarchived":
+        return { ...base, text: `restored the draft ${record}${v}`, href: recordHref };
+      case "record.retired":
+        return {
+          ...base,
+          text: `retired ${record}${v}`,
+          note: [d.reason ? `"${d.reason}"` : "", d.draftsArchived ? `The draft of the next version was archived too.` : ""].filter(Boolean).join(" ") || undefined,
+          href: typeof d.lockId === "string" ? `/app/l/${d.lockId}` : recordHref,
+        };
+      case "record.restored":
+        return { ...base, text: `restored ${record}${v}, so it's in use again`, href: typeof d.lockId === "string" ? `/app/l/${d.lockId}` : recordHref };
       default:
         return { ...base, text: r.action };
     }

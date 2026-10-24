@@ -9,6 +9,7 @@ import Avatar from "./Avatar";
 import type { KnowledgeClaim } from "@/lib/protocol";
 import type { FixSuggestion, ProviderId, RecordView, ReviewIssue, SignerView } from "@/lib/demo/types";
 import { useKL } from "./KLContext";
+import { ArchiveDraftButton } from "./app/RetireControls";
 
 const PROVIDER_LABEL: Record<ProviderId, string> = { anthropic: "Anthropic", openai: "OpenAI", google: "Google" };
 
@@ -288,17 +289,18 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
     <div className="mx-auto max-w-[680px]">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <p className="text-sm font-semibold">{record.payload.title}</p>
-        <p className="text-sm text-muted">
+        <p className="flex flex-wrap items-baseline gap-x-4 text-sm text-muted">
           {record.version > 1 ? (
-            <>
+            <span>
               Draft v{record.version}, changing{" "}
               <Link href={kl.lockPath(record.parentLockId ?? "")} className="underline hover:text-ink">
                 locked v{record.version - 1}
               </Link>
-            </>
+            </span>
           ) : (
-            "Draft v1"
+            <span>Draft v1</span>
           )}
+          {product && view.canArchive ? <ArchiveDraftButton recordId={record.id} archived={false} compact /> : null}
         </p>
       </div>
 

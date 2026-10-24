@@ -91,6 +91,8 @@ export interface RecordView {
   policyLockId: string;
   /** Product only: whether sign-offs need a passkey, and whether the viewer has one. */
   passkeys?: { required: boolean; mine: boolean };
+  /** Product only: whether the viewer can archive this draft (its creator or an owner). */
+  canArchive?: boolean;
 }
 
 /** A person who signs a record off. In the demo, a fictional stakeholder anyone can act for; in the product, a real member. */

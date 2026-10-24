@@ -13,7 +13,7 @@ export default async function PoliciesPage() {
   const [row] = await db<{ policyLockId: string | null }[]>`SELECT policy_lock_id AS "policyLockId" FROM kl_organisations WHERE id = ${org.orgId}`;
   const policyLockId = row?.policyLockId ?? null;
   const claims = await policyClaimsFor(org.orgId, policyLockId);
-  const drafts = (await listRecords(org.orgId, ctx.user.id)).filter((r) => r.kind === "policy" && r.status === "draft");
+  const drafts = (await listRecords(org.orgId, ctx.user.id)).filter((r) => r.kind === "policy" && r.status === "draft" && !r.archived);
   const owner = org.role === "owner";
 
   return (

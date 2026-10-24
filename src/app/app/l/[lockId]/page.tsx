@@ -35,6 +35,8 @@ export default async function ProductLockPage({
         questions={[]}
         sampleTicket=""
         canPropose={canPropose}
+        retired={view.retired}
+        canRetire={role === "owner"}
       />
     </ProductMode>
   );

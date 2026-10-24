@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Check, FileText, Lock, Plus, ShieldCheck } from "lucide-react";
+import { Archive, ArrowRight, Check, ChevronDown, FileText, Lock, Plus, ShieldCheck } from "lucide-react";
 import { getContext } from "@/lib/app/context";
 import { listRecords, type RecordSummary } from "@/lib/app/records";
 import { ROLE_HELP, withArticle } from "@/lib/app/roles";
@@ -21,12 +21,18 @@ function Row({ r }: { r: RecordSummary }) {
             {r.status === "locked"
               ? r.superseded
                 ? "replaced by a newer version"
-                : "locked"
-              : `${r.approvals} of ${r.quorum} approvals`}{" "}
+                : r.retired
+                  ? "retired"
+                  : "locked"
+              : r.archived
+                ? "archived draft"
+                : `${r.approvals} of ${r.quorum} approvals`}{" "}
             · {fmt(r.updatedAt)}
           </span>
         </span>
-        {r.status === "locked" ? (
+        {r.archived || r.retired ? (
+          <Archive className="h-4 w-4 shrink-0 text-ink/70" />
+        ) : r.status === "locked" ? (
           <Lock className="h-4 w-4 shrink-0 text-good" />
         ) : r.waitingOnMe ? (
           <span className="shrink-0 rounded-full bg-accent/[0.06] px-2.5 py-1 text-xs font-semibold text-accent">Needs you</span>
@@ -85,8 +91,9 @@ export default async function AppHome() {
   const org = ctx.current;
   const records = await listRecords(org.orgId, ctx.user.id);
   const waiting = records.filter((r) => r.waitingOnMe);
-  const drafts = records.filter((r) => r.status === "draft" && !r.waitingOnMe);
-  const locked = records.filter((r) => r.status === "locked" && !r.superseded);
+  const drafts = records.filter((r) => r.status === "draft" && !r.waitingOnMe && !r.archived);
+  const locked = records.filter((r) => r.status === "locked" && !r.superseded && !r.retired);
+  const archived = records.filter((r) => r.archived || (r.retired && !r.superseded));
   const canCreate = org.role !== "viewer";
 
   return (
@@ -123,6 +130,20 @@ export default async function AppHome() {
         records={locked}
         empty={canCreate ? "Nothing locked yet. Start with a new record, or propose your policy first." : "Nothing locked yet."}
       />
+      {archived.length ? (
+        <details className="group mt-10">
+          <summary className="flex cursor-pointer list-none items-center gap-2 text-lg font-semibold [&::-webkit-details-marker]:hidden">
+            Archived ({archived.length})
+            <ChevronDown className="h-4 w-4 text-ink/70 transition group-open:rotate-180" />
+          </summary>
+          <p className="mt-1 text-sm text-ink/70">Archived drafts and retired records. Nothing here is used by the agent, Jira checks or the API.</p>
+          <ul className="mt-2 divide-y divide-ink/10 border-y border-ink/10">
+            {archived.map((r) => (
+              <Row key={r.id} r={r} />
+            ))}
+          </ul>
+        </details>
+      ) : null}
     </div>
   );
 }

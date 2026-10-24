@@ -5,7 +5,7 @@ import { appUrl } from "@/lib/mode";
 import type { AppUser } from "./auth";
 import { appDb } from "./db";
 import { AppError, audit } from "./orgs";
-import { checkOrgDrift, memberRole, orgLock } from "./records";
+import { checkOrgDrift, currentRetirement, memberRole, orgLock, retiredFor, retiredMessage, type Retirement } from "./records";
 import { seal, unseal } from "./secrets";
 
 /**
@@ -16,6 +16,7 @@ import { seal, unseal } from "./secrets";
  *   changes (signed Jira webhook). Automatic checks only comment when the result changes.
  * - Create one Jira issue per requirement from a locked record.
  * - When a record gets a new version, its linked issues move to it.
+ * - When an owner retires a record, its linked issues get a comment and stop being checked automatically.
  */
 
 // ---------- Connection ----------
@@ -376,14 +377,15 @@ async function setRemoteLink(conn: JiraConnection, orgId: string, issueKey: stri
   const found = await orgLock(orgId, lockId);
   if (!found) return;
   const version = Number(found.block.payload.metadata?.version ?? 1);
+  const retired = await currentRetirement(lockId);
   await jira(conn, "POST", `/rest/api/3/issue/${encodeURIComponent(issueKey)}/remotelink`, {
     globalId: `knowledge-lock:${orgId}:${await rootLock(orgId, lockId)}`,
     application: { type: "com.guidedorchestration.knowledgelock", name: "Knowledge Lock" },
     relationship: "agreed in",
     object: {
       url: lockUrl(lockId),
-      title: `Knowledge Lock: ${found.block.payload.title} (v${version})`,
-      summary: "The signed-off version this issue should follow.",
+      title: `Knowledge Lock: ${found.block.payload.title} (v${version}${retired ? ", retired" : ""})`,
+      summary: retired ? "This record has been retired. It's no longer the signed-off version." : "The signed-off version this issue should follow.",
       icon: { url16x16: `${appUrl()}/favicon.ico`, title: "Knowledge Lock" },
     },
   });
@@ -571,6 +573,8 @@ export async function createIssues(user: AppUser, orgId: string, lockId: string,
   const found = await orgLock(orgId, lockId);
   if (!found) throw new DemoError("Locked record not found.", 404);
   if (await postgresStore.getSupersededBy(lockId)) throw new DemoError("This version has been replaced. Create issues from the current version.", 409);
+  const retired = await currentRetirement(lockId);
+  if (retired) throw new DemoError(retiredMessage(retired), 410);
   const projectKey = typeof projectKeyRaw === "string" ? projectKeyRaw.trim().toUpperCase() : "";
   if (!/^[A-Z][A-Z0-9_]{0,19}$/.test(projectKey)) throw new DemoError("Choose a Jira project.");
   const conn = await connectionFor(orgId);
@@ -644,6 +648,52 @@ export async function onNewVersion(orgId: string, parentLockId: string, newLockI
   }
 }
 
+// ---------- Retired records ----------
+
+const longDate = (ms: number) => new Intl.DateTimeFormat("en-GB", { dateStyle: "long", timeZone: "Europe/London" }).format(ms);
+
+/** Tells each issue linked to a record that it has been retired (or restored), and updates its web link. */
+async function tellLinkedIssues(orgId: string, lockId: string, body: (title: string, version: number) => unknown) {
+  const conn = await getConnection(orgId);
+  if (!conn) return;
+  const found = await orgLock(orgId, lockId);
+  if (!found) return;
+  const version = Number(found.block.payload.metadata?.version ?? 1);
+  const db = await appDb();
+  const rows = await db<{ issueKey: string }[]>`
+    SELECT issue_key AS "issueKey" FROM kl_jira_links WHERE org_id = ${orgId} AND lock_id = ${lockId} AND unlinked_at IS NULL`;
+  for (const r of rows.slice(0, 50)) {
+    try {
+      await jira(conn, "POST", `/rest/api/3/issue/${encodeURIComponent(r.issueKey)}/comment`, { body: body(found.block.payload.title, version) });
+      await setRemoteLink(conn, orgId, r.issueKey, lockId);
+    } catch (err) {
+      console.warn("[knowledge-lock] jira retired notice", r.issueKey, (err as Error).message);
+    }
+  }
+}
+
+export async function onRetired(orgId: string, retirement: Retirement) {
+  await tellLinkedIssues(orgId, retirement.lockId, (title, version) =>
+    doc(
+      para(strong("🛑 Knowledge Lock: the record this issue follows has been retired.")),
+      para(
+        link(`${title} (v${version})`, lockUrl(retirement.lockId)),
+        t(` was retired by ${retirement.by} on ${longDate(retirement.at)}. It's no longer the signed-off version, so this issue isn't checked against it any more.`)
+      ),
+      para(t(`Reason: ${retirement.reason}`))
+    )
+  );
+}
+
+export async function onRestored(orgId: string, lockId: string, by: string) {
+  await tellLinkedIssues(orgId, lockId, (title, version) =>
+    doc(
+      para(strong("✅ Knowledge Lock: the record this issue follows is back in use.")),
+      para(link(`${title} (v${version})`, lockUrl(lockId)), t(` was restored by ${by}. It's the signed-off version again.`))
+    )
+  );
+}
+
 // ---------- Webhook ----------
 
 export function verifySignature(secret: string, rawBody: string, header: string | null): boolean {
@@ -687,6 +737,8 @@ export async function acceptWebhook(orgId: string, rawBody: string, signature: s
     issueId,
   ]);
   if (!link) return null;
+  // A retired record isn't checked against any more.
+  if (await retiredFor(link.lockId)) return null;
   return async () => {
     try {
       // Skip if the text we check hasn't actually changed (Jira can send several events for one edit).

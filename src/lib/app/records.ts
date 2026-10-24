@@ -70,6 +70,16 @@ export interface AppRecord extends DemoRecord {
   requirePasskeys?: boolean;
   /** Who has been emailed that their sign-off is needed, for which wording. Stops repeat emails. */
   notified?: { hash: string; userIds: string[] };
+  /** An archived draft: hidden from the main lists, and nothing more can happen to it until it's restored. */
+  archived?: { at: number; byId: string; byName: string; because?: "retired" };
+}
+
+/** A locked record an owner has taken out of use. The lock itself never changes and still verifies. */
+export interface Retirement {
+  lockId: string;
+  at: number;
+  by: string;
+  reason: string;
 }
 
 export const MAX_CLAIMS = 30;
@@ -124,6 +134,7 @@ export async function recordFor(user: AppUser, id: string, need: "read" | "edit"
 
 function assertDraft(record: AppRecord) {
   if (record.status !== "draft") throw new DemoError("This record is locked. Propose a change to create a new version.", 409);
+  if (record.archived) throw new DemoError("This draft is archived. Restore it to carry on.", 409);
 }
 
 /** A lock that belongs to one of this organisation's records. */
@@ -134,6 +145,37 @@ export async function orgLock(orgId: string, lockId: string): Promise<{ block: K
     WHERE l.lock_id = ${lockId} AND r.org_id = ${orgId}`;
   return row ?? null;
 }
+
+// ---------- Retired records ----------
+
+const longDate = (ms: number) => new Intl.DateTimeFormat("en-GB", { dateStyle: "long", timeZone: "Europe/London" }).format(ms);
+
+/** The retirement of this exact lock, if it's currently retired. */
+export async function currentRetirement(lockId: string): Promise<Retirement | null> {
+  const db = await appDb();
+  const [row] = await db<{ at: Date; by: string; reason: string }[]>`
+    SELECT retired_at AS at, retired_by_name AS by, reason FROM kl_retirements WHERE lock_id = ${lockId} AND restored_at IS NULL`;
+  return row ? { lockId, at: row.at.getTime(), by: row.by, reason: row.reason } : null;
+}
+
+/** The newest version in a lock's chain. */
+async function newestVersion(lockId: string): Promise<string> {
+  let id = lockId;
+  for (let i = 0; i < 50; i++) {
+    const next = await postgresStore.getSupersededBy(id);
+    if (!next) return id;
+    id = next;
+  }
+  return id;
+}
+
+/** Whether the record this lock belongs to has been retired. Retiring covers every version, not just the newest. */
+export async function retiredFor(lockId: string): Promise<Retirement | null> {
+  return currentRetirement(await newestVersion(lockId));
+}
+
+export const retiredMessage = (r: Retirement) =>
+  `This record was retired on ${longDate(r.at)} by ${r.by}, so it's no longer the signed-off version. Reason: ${r.reason}`;
 
 export async function policyClaimsFor(orgId: string, policyLockId: string | null | undefined): Promise<KnowledgeClaim[]> {
   if (!policyLockId) return [];
@@ -270,6 +312,7 @@ export async function viewFor(record: AppRecord, user: AppUser, role: Role): Pro
     maxClaims: MAX_CLAIMS,
     kind: record.kind,
     passkeys: { required: Boolean(record.requirePasskeys), mine: await hasPasskey(user.id) },
+    canArchive: record.status === "draft" && !record.archived && (role === "owner" || record.createdBy === user.id),
   };
 }
 
@@ -286,15 +329,18 @@ export interface RecordSummary {
   signerCount: number;
   waitingOnMe: boolean;
   superseded: boolean;
+  archived: boolean;
+  retired: boolean;
 }
 
 export async function listRecords(orgId: string, userId: string): Promise<RecordSummary[]> {
   const db = await appDb();
-  const rows = await db<{ data: AppRecord; updatedAt: Date; superseded: boolean }[]>`
+  const rows = await db<{ data: AppRecord; updatedAt: Date; superseded: boolean; retired: boolean }[]>`
     SELECT r.data, r.updated_at AS "updatedAt",
-      EXISTS (SELECT 1 FROM kl_supersessions s WHERE s.lock_id = r.lock_id) AS superseded
+      EXISTS (SELECT 1 FROM kl_supersessions s WHERE s.lock_id = r.lock_id) AS superseded,
+      EXISTS (SELECT 1 FROM kl_retirements x WHERE x.lock_id = r.lock_id AND x.restored_at IS NULL) AS retired
     FROM kl_app_records r WHERE r.org_id = ${orgId} ORDER BY r.updated_at DESC LIMIT 200`;
-  return rows.map(({ data: r, updatedAt, superseded }) => {
+  return rows.map(({ data: r, updatedAt, superseded, retired }) => {
     const current = r.attestations.filter((a) => a.attestorType === "human" && a.subjectHash === r.payloadHash);
     const mine = current.find((a) => a.role === signerKey(userId));
     return {
@@ -308,8 +354,10 @@ export async function listRecords(orgId: string, userId: string): Promise<Record
       approvals: current.filter((a) => a.decision === "APPROVE").length,
       quorum: r.quorum,
       signerCount: r.signers.length,
-      waitingOnMe: r.status === "draft" && r.signers.some((s) => s.userId === userId) && !mine,
+      waitingOnMe: r.status === "draft" && !r.archived && r.signers.some((s) => s.userId === userId) && !mine,
       superseded,
+      archived: Boolean(r.archived),
+      retired,
     };
   });
 }
@@ -351,6 +399,7 @@ export async function createRecord(
     const parent = await orgLock(orgId, input.parentLockId);
     if (!parent) throw new DemoError("Locked record not found.", 404);
     if (await postgresStore.getSupersededBy(input.parentLockId)) throw new DemoError("This record has already been replaced by a newer version.", 409);
+    if (await currentRetirement(input.parentLockId)) throw new DemoError("This record has been retired. An owner can restore it before anyone changes it.", 409);
     const prev = await loadRecord(parent.recordId);
     if (!prev) throw new DemoError("Locked record not found.", 404);
     if (prev.kind === "policy" && role !== "owner") throw new DemoError("Only owners can change the policy.", 403);
@@ -648,6 +697,9 @@ export async function lockRecord(user: AppUser, id: string): Promise<string> {
   if (record.parentLockId && (await postgresStore.getSupersededBy(record.parentLockId))) {
     throw new DemoError("The previous version has already been replaced by another change.", 409);
   }
+  if (record.parentLockId && (await currentRetirement(record.parentLockId))) {
+    throw new DemoError("The record this draft changes has been retired, so it can't be locked. An owner can restore it first.", 409);
+  }
   const key = await getAuthorityKey();
   const block = await createKnowledgeLock({
     payload: record.payload,
@@ -701,7 +753,11 @@ export async function lockRecord(user: AppUser, id: string): Promise<string> {
 
 // ---------- Locks ----------
 
-export async function lockView(user: AppUser, orgId: string, lockId: string): Promise<(LockView & { kind: RecordKind; record: AppRecord }) | null> {
+export async function lockView(
+  user: AppUser,
+  orgId: string,
+  lockId: string
+): Promise<(LockView & { kind: RecordKind; record: AppRecord; retired: Retirement | null }) | null> {
   const lock = await orgLock(orgId, lockId);
   if (!lock || !(await memberRole(orgId, user.id))) return null;
   const record = await loadRecord(lock.recordId);
@@ -718,6 +774,7 @@ export async function lockView(user: AppUser, orgId: string, lockId: string): Pr
     modelsLive: !stubEnabled(),
     kind: record.kind,
     record,
+    retired: await currentRetirement(lockId),
   };
 }
 
@@ -736,6 +793,8 @@ async function usableOrgLock(orgId: string, lockId: string) {
   if (!lock) throw new DemoError("Locked record not found.", 404);
   const check = await verifyKnowledgeLock(lock.block);
   if (!check.valid) throw new DemoError("This record failed verification, so the agent will not use it.", 409);
+  const retired = await retiredFor(lockId);
+  if (retired) throw new DemoError(retiredMessage(retired), 410);
   const org = await getOrg(orgId);
   const policy = await policyClaimsFor(orgId, lock.block.payload.metadata?.policyLockId as string | undefined);
   return { orgId, org, block: lock.block, policy };
@@ -804,6 +863,159 @@ export async function checkOrgDrift(orgIdIn: string, lockId: string, work: unkno
   return { summary: String(raw.summary ?? "").slice(0, 400), findings, model: provider.model, provider: provider.id, stub: !provider.apiKey };
 }
 
+// ---------- Archiving drafts ----------
+
+async function nameOf(user: AppUser): Promise<string> {
+  return (await getProfile(user.id))?.name || user.email;
+}
+
+/** Hides a draft from the main lists. Its creator or an owner can do it, and undo it. */
+export async function archiveDraft(user: AppUser, id: string): Promise<AppRecord> {
+  const { record, role } = await recordFor(user, id, "edit");
+  if (record.status !== "draft") {
+    throw new DemoError("Only drafts can be archived. To take a locked record out of use, an owner can retire it.", 409);
+  }
+  if (record.archived) return record;
+  if (role !== "owner" && record.createdBy !== user.id) {
+    throw new DemoError("Only the person who started this draft, or an owner, can archive it.", 403);
+  }
+  record.archived = { at: Date.now(), byId: user.id, byName: await nameOf(user) };
+  record.updatedAt = Date.now();
+  await saveRecord(record);
+  await audit(record.orgId, user, "record.archived", record.id, { version: record.version });
+  return record;
+}
+
+export async function restoreDraft(user: AppUser, id: string): Promise<AppRecord> {
+  const { record, role } = await recordFor(user, id, "edit");
+  if (!record.archived) return record;
+  if (role !== "owner" && record.createdBy !== user.id) {
+    throw new DemoError("Only the person who started this draft, or an owner, can restore it.", 403);
+  }
+  if (record.parentLockId) {
+    if (await currentRetirement(record.parentLockId)) {
+      throw new DemoError("The record this draft changes has been retired. Restore that record first.", 409);
+    }
+    if (await postgresStore.getSupersededBy(record.parentLockId)) {
+      throw new DemoError("Another change has already replaced the version this draft started from, so it can't be restored.", 409);
+    }
+  }
+  delete record.archived;
+  record.updatedAt = Date.now();
+  await saveRecord(record);
+  await audit(record.orgId, user, "record.unarchived", record.id, { version: record.version });
+  return record;
+}
+
+// ---------- Retiring locked records ----------
+
+async function ownerLock(user: AppUser, lockId: string) {
+  const orgId = await lockOrg(user, lockId);
+  const lock = orgId ? await orgLock(orgId, lockId) : null;
+  const record = lock ? await loadRecord(lock.recordId) : null;
+  if (!orgId || !lock || !record) throw new DemoError("Locked record not found.", 404);
+  if ((await memberRole(orgId, user.id)) !== "owner") throw new DemoError("Only owners can retire or restore a locked record.", 403);
+  return { orgId, lock, record, org: await getOrg(orgId) };
+}
+
+async function tellEveryone(
+  record: AppRecord,
+  org: Org,
+  actor: AppUser,
+  lockId: string,
+  n: { subject: string; heading: string; lines: string[]; headline: string }
+) {
+  await notify(
+    [await emailOf(record.createdBy), ...record.signers.map((s) => s.email)],
+    actor.email,
+    noticeEmail({ orgName: org.name, subject: n.subject, heading: n.heading, lines: n.lines, cta: "See the record", url: lockUrl(lockId) })
+  );
+  await postToChannels(record.orgId, "retired", {
+    orgName: org.name,
+    headline: n.headline,
+    lines: n.lines,
+    people: [],
+    cta: "See the record",
+    url: lockUrl(lockId),
+  });
+}
+
+/**
+ * An owner says a locked record is no longer the source of truth. The lock still verifies, but the agent,
+ * checks and API treat it as retired. Any draft of a next version is archived with it.
+ */
+export async function retireLock(
+  user: AppUser,
+  lockId: string,
+  reasonRaw: unknown
+): Promise<{ orgId: string; retirement: Retirement; draftsArchived: number }> {
+  const { orgId, lock, record, org } = await ownerLock(user, lockId);
+  if (record.kind === "policy") throw new DemoError("The policy can't be retired. Propose a new version of it instead.", 409);
+  if (await postgresStore.getSupersededBy(lockId)) {
+    throw new DemoError("A newer version has replaced this one. Retire the current version instead.", 409);
+  }
+  if (await currentRetirement(lockId)) throw new DemoError("This record is already retired.", 409);
+  const reason = typeof reasonRaw === "string" ? reasonRaw.trim().replace(/\s+/g, " ").slice(0, 400) : "";
+  if (!reason) throw new DemoError("Say why it's being retired. Everyone who opens it, and any agent that asks for it, will see this.");
+  const by = await nameOf(user);
+  const db = await appDb();
+  try {
+    await db`
+      INSERT INTO kl_retirements (id, org_id, lock_id, record_id, reason, retired_by, retired_by_name)
+      VALUES (${newId()}, ${orgId}, ${lockId}, ${record.id}, ${reason}, ${user.id}, ${by})`;
+  } catch (err) {
+    if ((err as { code?: string }).code === "23505") throw new DemoError("This record is already retired.", 409);
+    throw err;
+  }
+  const retirement = (await currentRetirement(lockId))!;
+
+  // A change that was under way would otherwise be locked as a new version of a retired record.
+  const drafts = await db<{ data: AppRecord }[]>`
+    SELECT data FROM kl_app_records WHERE org_id = ${orgId} AND status = 'draft' AND data->>'parentLockId' = ${lockId}`;
+  let draftsArchived = 0;
+  for (const { data: d } of drafts) {
+    if (d.archived) continue;
+    d.archived = { at: Date.now(), byId: user.id, byName: by, because: "retired" };
+    d.updatedAt = Date.now();
+    await saveRecord(d);
+    draftsArchived++;
+  }
+
+  const version = Number(lock.block.payload.metadata?.version ?? record.version);
+  await audit(orgId, user, "record.retired", record.id, { lockId, version, reason, ...(draftsArchived ? { draftsArchived } : {}) });
+  const lines = [
+    `${by} retired v${version} of ${what(record)} in ${org.name}. It's no longer the signed-off version, so teams and AI agents shouldn't work from it.`,
+    `Reason: ${reason}`,
+  ];
+  await tellEveryone(record, org, user, lockId, {
+    subject: `Retired: ${record.payload.title}`,
+    heading: `${what(record)} has been retired`,
+    lines,
+    headline: `Retired: ${record.payload.title} (v${version})`,
+  });
+  return { orgId, retirement, draftsArchived };
+}
+
+export async function restoreLock(user: AppUser, lockId: string): Promise<{ orgId: string; by: string }> {
+  const { orgId, lock, record, org } = await ownerLock(user, lockId);
+  const by = await nameOf(user);
+  const db = await appDb();
+  const rows = await db`
+    UPDATE kl_retirements SET restored_at = now(), restored_by = ${user.id}, restored_by_name = ${by}
+    WHERE lock_id = ${lockId} AND restored_at IS NULL RETURNING id`;
+  if (!rows.length) throw new DemoError("This record isn't retired.", 409);
+  const version = Number(lock.block.payload.metadata?.version ?? record.version);
+  await audit(orgId, user, "record.restored", record.id, { lockId, version });
+  const lines = [`${by} restored v${version} of ${what(record)} in ${org.name}. It's the signed-off version again.`];
+  await tellEveryone(record, org, user, lockId, {
+    subject: `Restored: ${record.payload.title}`,
+    heading: `${what(record)} is back in use`,
+    lines,
+    headline: `Restored: ${record.payload.title} (v${version})`,
+  });
+  return { orgId, by };
+}
+
 // ---------- For the API ----------
 
 export interface LockSummary {
@@ -814,20 +1026,32 @@ export interface LockSummary {
   version: number;
   lockedAt: string;
   supersededBy: string | null;
+  /** Set when an owner has retired the record: it's no longer the signed-off version. */
+  retired: { retiredAt: string; retiredBy: string; reason: string } | null;
   claims: { id: string; statement: string }[];
 }
 
-/** The organisation's locked records, newest first. Replaced versions are left out unless asked for. */
-export async function listOrgLocks(orgId: string, includeReplaced = false): Promise<LockSummary[]> {
+/** The organisation's locked records, newest first. Replaced and retired versions are left out unless asked for. */
+export async function listOrgLocks(orgId: string, include: { replaced?: boolean; retired?: boolean } = {}): Promise<LockSummary[]> {
   const db = await appDb();
-  const rows = await db<{ block: KnowledgeLockBlock; recordId: string; kind: RecordKind; supersededBy: string | null }[]>`
-    SELECT l.block, l.record_id AS "recordId", r.kind, s.superseded_by AS "supersededBy"
+  const rows = await db<{
+    block: KnowledgeLockBlock;
+    recordId: string;
+    kind: RecordKind;
+    supersededBy: string | null;
+    retiredAt: Date | null;
+    retiredBy: string | null;
+    reason: string | null;
+  }[]>`
+    SELECT l.block, l.record_id AS "recordId", r.kind, s.superseded_by AS "supersededBy",
+      x.retired_at AS "retiredAt", x.retired_by_name AS "retiredBy", x.reason
     FROM kl_locks l JOIN kl_app_records r ON r.id = l.record_id
     LEFT JOIN kl_supersessions s ON s.lock_id = l.lock_id
+    LEFT JOIN kl_retirements x ON x.lock_id = l.lock_id AND x.restored_at IS NULL
     WHERE r.org_id = ${orgId}
     ORDER BY l.created_at DESC`;
   return rows
-    .filter((r) => includeReplaced || !r.supersededBy)
+    .filter((r) => (include.replaced || !r.supersededBy) && (include.retired || !r.retiredAt))
     .map((r) => ({
       lockId: r.block.lockId,
       recordId: r.recordId,
@@ -836,6 +1060,7 @@ export async function listOrgLocks(orgId: string, includeReplaced = false): Prom
       version: Number(r.block.payload.metadata?.version ?? 1),
       lockedAt: new Date(r.block.lockedAt).toISOString(),
       supersededBy: r.supersededBy,
+      retired: r.retiredAt ? { retiredAt: r.retiredAt.toISOString(), retiredBy: r.retiredBy ?? "", reason: r.reason ?? "" } : null,
       claims: r.block.payload.claims.map((c) => ({ id: c.id, statement: c.statement })),
     }));
 }

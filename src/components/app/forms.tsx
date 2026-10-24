@@ -302,6 +302,7 @@ const EVENTS: { id: string; label: string; help: string }[] = [
   { id: "signoff_needed", label: "Sign-off needed", help: "When the AI reviewers approve a draft, mentioning who still has to sign" },
   { id: "changes_requested", label: "Changes requested", help: "When a signer asks for changes, with their comment" },
   { id: "locked", label: "Locked", help: "When a record or the policy is locked" },
+  { id: "retired", label: "Retired", help: "When an owner retires a locked record, or restores one" },
 ];
 
 export function AddChannelForm({ action }: { action: Action }) {

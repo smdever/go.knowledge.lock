@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Bot, Check, KeyRound, Lock, X } from "lucide-react";
+import { Archive, Bot, Check, KeyRound, Lock, X } from "lucide-react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import type { KnowledgeLockBlock, VerificationResult } from "@/lib/protocol";
 import type { ProviderId, Resolution } from "@/lib/demo/types";
@@ -11,12 +11,15 @@ import StartButton from "./StartButton";
 import Avatar from "./Avatar";
 import { useKL } from "./KLContext";
 import JiraPanel from "./app/JiraPanel";
+import { RestoreLockButton, RetireForm } from "./app/RetireControls";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://guidedorchestration.com";
 const APP_URL = (process.env.NEXT_PUBLIC_KL_APP_URL || "https://app.knowledge-lock.com").replace(/\/$/, "");
 const PROVIDER_NAMES: Record<ProviderId, string> = { anthropic: "Anthropic", openai: "OpenAI", google: "Google" };
 
 type Tab = "record" | "verify" | "build";
+
+const fmtDay = (ms: number) => new Intl.DateTimeFormat("en-GB", { dateStyle: "long", timeZone: "Europe/London" }).format(ms);
 
 const fmt = (ms: number) =>
   new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/London" }).format(ms);
@@ -32,6 +35,8 @@ export default function LockScreens({
   questions,
   sampleTicket,
   canPropose = true,
+  retired = null,
+  canRetire = false,
 }: {
   block: KnowledgeLockBlock;
   verification: VerificationResult;
@@ -44,6 +49,10 @@ export default function LockScreens({
   sampleTicket: string;
   /** Product viewers can read and verify a lock but not start a new version. */
   canPropose?: boolean;
+  /** Product only: set when an owner has taken this record out of use. */
+  retired?: { at: number; by: string; reason: string } | null;
+  /** Product owners can retire a current record, or restore a retired one. */
+  canRetire?: boolean;
 }) {
   const { mode, lockPath } = useKL();
   const product = mode === "app";
@@ -70,6 +79,21 @@ export default function LockScreens({
   return (
     <MotionConfig reducedMotion="user">
     <div className="mx-auto max-w-[680px]">
+      {retired ? (
+        <div role="status" className="mb-6 rounded-lg border border-warn/50 bg-surface px-4 py-3 text-sm leading-relaxed">
+          <p className="flex items-center gap-2 font-semibold text-warn">
+            <Archive className="h-4 w-4 shrink-0" /> Retired on {fmtDay(retired.at)} by {retired.by}
+          </p>
+          <p className="mt-1 text-ink/80">
+            This is no longer the signed-off version. The agent, Jira checks and the API won&apos;t use it. It still verifies, so
+            you can show exactly what was agreed.
+          </p>
+          <p className="mt-2">
+            <span className="font-semibold">Reason:</span> {retired.reason}
+          </p>
+          {canRetire ? <RestoreLockButton lockId={block.lockId} /> : null}
+        </div>
+      ) : null}
       {supersededBy ? (
         <p className="mb-6 rounded-lg border border-warn/40 bg-surface px-3 py-2.5 text-sm text-warn">
           A newer version has replaced this one.{" "}
@@ -80,9 +104,15 @@ export default function LockScreens({
       ) : null}
 
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-good">
-          <Lock className="h-4 w-4" /> {isPolicy ? "Locked policy" : `Locked v${version}`}
-        </p>
+        {retired ? (
+          <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-warn">
+            <Archive className="h-4 w-4" /> Retired v{version}
+          </p>
+        ) : (
+          <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-good">
+            <Lock className="h-4 w-4" /> {isPolicy ? "Locked policy" : `Locked v${version}`}
+          </p>
+        )}
         <p className="text-sm text-muted">Locked {fmt(block.lockedAt)}</p>
       </div>
 
@@ -237,15 +267,24 @@ export default function LockScreens({
 
       {tab === "build" ? (
         <Panel key="build">
-          <Heading
-            title="Teams and AI agents work from this version only"
-            text="Ask the agent a question, or check a backlog ticket against what was agreed."
-          />
-          <div className="mt-6">
-            <Build lockId={block.lockId} questions={questions} sampleTicket={sampleTicket} />
-          </div>
+          {retired ? (
+            <Heading
+              title="This record is retired, so nothing is built from it"
+              text="The agent won't answer questions from it, and tickets and Jira issues aren't checked against it. An owner can restore it if it's needed again."
+            />
+          ) : (
+            <>
+              <Heading
+                title="Teams and AI agents work from this version only"
+                text="Ask the agent a question, or check a backlog ticket against what was agreed."
+              />
+              <div className="mt-6">
+                <Build lockId={block.lockId} questions={questions} sampleTicket={sampleTicket} />
+              </div>
+            </>
+          )}
 
-          {product && !isPolicy ? (
+          {product && !isPolicy && !retired ? (
             <div className="mt-10 border-t border-ink/10 pt-8">
               <h2 className="text-lg font-semibold">Jira</h2>
               <p className="mt-1 max-w-[60ch] text-[15px] leading-relaxed text-ink/70">
@@ -258,7 +297,7 @@ export default function LockScreens({
           ) : null}
 
           <div className="mt-10 border-t border-ink/10 pt-8">
-            {!supersededBy && canPropose ? (
+            {!supersededBy && !retired && canPropose ? (
               <>
                 <h2 className="text-lg font-semibold">Need to change something?</h2>
                 <p className="mt-1 max-w-[60ch] text-[15px] leading-relaxed text-ink/70">
@@ -269,6 +308,18 @@ export default function LockScreens({
                   <StartButton parentLockId={block.lockId} label="Propose a change" />
                 </div>
               </>
+            ) : null}
+            {product && canRetire && !supersededBy && !retired && !isPolicy ? (
+              <div className={canPropose ? "mt-10" : ""}>
+                <h2 className="text-lg font-semibold">Take it out of use</h2>
+                <p className="mt-1 max-w-[60ch] text-[15px] leading-relaxed text-ink/70">
+                  Retire it, and it stops being the signed-off version. The agent, Jira checks and the API stop using it, but the
+                  lock still verifies and stays in your records. You can restore it later.
+                </p>
+                <div className="mt-4">
+                  <RetireForm lockId={block.lockId} version={version} />
+                </div>
+              </div>
             ) : null}
             {!product ? (
               <div className="mt-8 rounded-2xl border border-accent/35 bg-accent/[0.06] p-5 sm:p-6">
