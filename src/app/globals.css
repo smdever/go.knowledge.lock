@@ -11,6 +11,7 @@
   --color-good: var(--good);
   --color-warn: var(--warn);
   --color-bad: var(--bad);
+  --color-surface: var(--surface);
 }
 
 @layer base {
@@ -24,6 +25,8 @@
     --good: #1f8a5b;
     --warn: #b7791f;
     --bad: #c2412d;
+    /* Solid card surface, so text never sits on stacked tints. */
+    --surface: #ffffff;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -37,6 +40,7 @@
       --good: #4cc38a;
       --warn: #e3b341;
       --bad: #f2785c;
+      --surface: #323d50;
     }
   }
 }

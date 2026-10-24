@@ -30,6 +30,52 @@ interface Objection {
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
+function Label({ children }: { children: React.ReactNode }) {
+  return <p className="text-xs font-semibold uppercase tracking-wider text-steel">{children}</p>;
+}
+
+/** Word-level diff: which words of `after` are new. Returns null when the wording was largely rewritten. */
+export function changedWords(before: string, after: string): boolean[] | null {
+  const a = before.split(/\s+/).filter(Boolean);
+  const b = after.split(/\s+/).filter(Boolean);
+  if (!a.length || !b.length || a.length * b.length > 40000) return null;
+  const norm = (w: string) => w.toLowerCase().replace(/[^\p{L}\p{N}£$%]/gu, "");
+  const dp = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0));
+  for (let i = a.length - 1; i >= 0; i--)
+    for (let j = b.length - 1; j >= 0; j--)
+      dp[i][j] = norm(a[i]) === norm(b[j]) ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+  const isNew = new Array<boolean>(b.length).fill(true);
+  let i = 0;
+  let j = 0;
+  while (i < a.length && j < b.length) {
+    if (norm(a[i]) === norm(b[j])) {
+      isNew[j] = false;
+      i++;
+      j++;
+    } else if (dp[i + 1][j] >= dp[i][j + 1]) i++;
+    else j++;
+  }
+  // Highlighting is only useful when most of the wording stayed the same.
+  return dp[0][0] / b.length >= 0.4 ? isNew : null;
+}
+
+/** The suggested wording, with new words highlighted when it's an edit rather than a rewrite. */
+function Changed({ before, after }: { before: string; after: string }) {
+  const flags = changedWords(before, after);
+  if (!flags) return <>{after}</>;
+  const words = after.split(/\s+/).filter(Boolean);
+  return (
+    <>
+      {words.map((w, k) => (
+        <span key={k}>
+          {flags[k] ? <mark className="rounded-sm bg-good/15 px-0.5 text-ink underline decoration-good/60 underline-offset-2">{w}</mark> : w}
+          {k < words.length - 1 ? " " : ""}
+        </span>
+      ))}
+    </>
+  );
+}
+
 const listNames = (names: string[]) =>
   names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 
@@ -841,38 +887,41 @@ function ObjectionCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, height: 0, marginTop: 0 }}
       transition={{ duration: 0.28, ease: EASE }}
-      className="mt-6 overflow-hidden rounded-xl border-2 border-bad/50 bg-white/40"
+      className="mt-6 overflow-hidden rounded-xl border border-bad/45 bg-surface shadow-sm"
     >
-      {/* The objection. Once a fix is on the table it steps back so the fix reads first. */}
-      <motion.div
-        animate={{ opacity: hasSuggestion ? 0.55 : 1 }}
-        transition={{ duration: 0.25 }}
-        className="p-5"
-      >
-        <p className="text-sm font-semibold text-bad">
-          {objection.claim.id}, objected to by {listNames(objection.raisedBy.map((p) => PROVIDER_LABEL[p]))}
-        </p>
-        <blockquote
-          className={`mt-2 text-[15px] leading-relaxed transition-colors duration-300 ${
-            hasSuggestion ? "text-ink/70 line-through decoration-bad/60" : ""
-          }`}
-        >
-          &ldquo;{objection.claim.statement}&rdquo;
-        </blockquote>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-ink/10 px-5 py-3">
+        <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-bad">
+          <AlertTriangle className="h-4 w-4" /> {objection.claim.id} is blocked
+        </span>
+        <span className="text-xs text-muted">
+          Objected to by {listNames(objection.raisedBy.map((p) => PROVIDER_LABEL[p]))}
+        </span>
+      </div>
 
-        {rules.length && !hasSuggestion ? (
-          <div className="mt-4 rounded-lg bg-bad/[0.07] p-3 text-sm leading-relaxed">
-            {rules.map((r) => (
-              <p key={r.id}>
-                <span className="font-semibold">Breaks {r.id}:</span> {r.statement}
-              </p>
-            ))}
-          </div>
+      <div className="space-y-5 p-5">
+        <section>
+          <Label>{hasSuggestion ? "Current wording" : "The requirement"}</Label>
+          <p className="mt-1.5 text-base leading-relaxed text-ink">{objection.claim.statement}</p>
+        </section>
+
+        {rules.length ? (
+          <section>
+            <Label>Why it&apos;s blocked</Label>
+            <div className="mt-1.5 space-y-2">
+              {rules.map((r) => (
+                <div key={r.id} className="border-l-[3px] border-bad pl-3">
+                  <p className="text-sm font-semibold text-bad">Breaks policy {r.id}</p>
+                  <p className="mt-0.5 text-[15px] leading-relaxed text-ink">{r.statement}</p>
+                </div>
+              ))}
+            </div>
+          </section>
         ) : null}
 
         {!hasSuggestion ? (
-          <>
-            <p className="mt-3 text-sm leading-relaxed text-ink/75">{objection.reasons[0].issue.detail}</p>
+          <section>
+            <Label>What the reviewers said</Label>
+            <p className="mt-1.5 text-[15px] leading-relaxed text-ink/85">{objection.reasons[0].issue.detail}</p>
             {objection.reasons.length > 1 ? (
               <button
                 type="button"
@@ -881,7 +930,7 @@ function ObjectionCard({
                 className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-steel hover:text-ink"
               >
                 <ChevronDown className={`h-4 w-4 transition-transform ${showDetails ? "rotate-180" : ""}`} />
-                What each reviewer said
+                Each reviewer in full
               </button>
             ) : null}
             <AnimatePresence initial={false}>
@@ -893,19 +942,19 @@ function ObjectionCard({
                   transition={{ duration: 0.22, ease: EASE }}
                   className="overflow-hidden"
                 >
-                  <ul className="mt-2 space-y-2 border-l-2 border-ink/10 pl-3 text-sm text-ink/70">
+                  <ul className="mt-2 space-y-2 text-sm leading-relaxed text-ink/85">
                     {objection.reasons.map((r, i) => (
                       <li key={i}>
-                        <span className="font-semibold">{PROVIDER_LABEL[r.provider]}:</span> {r.issue.detail}
+                        <span className="font-semibold text-ink">{PROVIDER_LABEL[r.provider]}:</span> {r.issue.detail}
                       </li>
                     ))}
                   </ul>
                 </motion.div>
               ) : null}
             </AnimatePresence>
-          </>
+          </section>
         ) : null}
-      </motion.div>
+      </div>
 
       <AnimatePresence mode="wait" initial={false}>
         {suggestion ? (
@@ -918,15 +967,19 @@ function ObjectionCard({
             transition={{ duration: 0.26, ease: EASE }}
             className="scroll-mb-24 overflow-hidden"
           >
-            <div className="border-l-4 border-good bg-[color-mix(in_srgb,var(--good)_10%,var(--bg-main))] p-5">
-              <p className="flex items-center gap-1.5 text-sm font-semibold text-good">
-                <Sparkles className="h-4 w-4" /> Suggested wording from {PROVIDER_LABEL[suggestion.provider]}
-                {suggestion.stub ? <span className="text-xs font-normal text-warn">(test stub)</span> : null}
-              </p>
-              <p className="mt-2 text-base leading-relaxed text-ink">{suggestion.statement}</p>
-              {suggestion.explanation ? (
-                <p className="mt-2 text-sm leading-relaxed text-ink/70">{suggestion.explanation}</p>
-              ) : null}
+            <div className="border-t border-ink/10 p-5">
+              <div className="border-l-[3px] border-good pl-3">
+                <p className="flex flex-wrap items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-good">
+                  <Sparkles className="h-3.5 w-3.5" /> Suggested wording from {PROVIDER_LABEL[suggestion.provider]}
+                  {suggestion.stub ? <span className="normal-case tracking-normal font-normal text-warn">(test stub)</span> : null}
+                </p>
+                <p className="mt-1.5 text-base leading-relaxed text-ink">
+                  <Changed before={objection.claim.statement} after={suggestion.statement} />
+                </p>
+                {suggestion.explanation ? (
+                  <p className="mt-2 text-[15px] leading-relaxed text-ink/85">{suggestion.explanation}</p>
+                ) : null}
+              </div>
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 <PrimaryButton onClick={onAccept}>
                   <Check className="h-4 w-4" /> Use this and review again
