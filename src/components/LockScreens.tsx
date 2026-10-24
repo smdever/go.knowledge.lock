@@ -71,7 +71,7 @@ export default function LockScreens({
     <MotionConfig reducedMotion="user">
     <div className="mx-auto max-w-[680px]">
       {supersededBy ? (
-        <p className="mb-6 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2.5 text-sm text-warn">
+        <p className="mb-6 rounded-lg border border-warn/40 bg-surface px-3 py-2.5 text-sm text-warn">
           A newer version has replaced this one.{" "}
           <Link href={lockPath(supersededBy)} className="font-semibold underline">
             Open the current version
@@ -145,11 +145,12 @@ export default function LockScreens({
                 {resolutions.length === 1 ? "One objection was resolved" : `${resolutions.length} objections were resolved`} before
                 locking
               </h2>
-              <p className="mt-1 text-sm text-ink/65">This history is part of the signed record, so it can&apos;t be rewritten.</p>
+              <p className="mt-1 text-sm text-ink/70">This history is part of the signed record, so it can&apos;t be rewritten.</p>
               <ul className="mt-4 space-y-4">
                 {resolutions.map((r, i) => (
-                  <li key={i} className="rounded-xl border border-ink/10 bg-white/35 p-4 text-sm leading-relaxed">
-                    <p className="text-ink/55 line-through decoration-bad/50">{r.originalStatement}</p>
+                  <li key={i} className="rounded-xl border border-ink/10 bg-surface p-4 text-sm leading-relaxed">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-steel">Original wording</p>
+                    <p className="mt-1 text-ink/80">{r.originalStatement}</p>
                     <p className="mt-2 text-bad">
                       {listNames(r.raisedBy.map((p) => PROVIDER_NAMES[p]))} objected
                       {r.issues[0]?.policyRef ? `: it broke ${r.issues[0].policyRef}` : ""}.
@@ -277,7 +278,7 @@ export default function LockScreens({
                   also get Slack and Teams notices, and an API so your AI agents work from what you locked.
                 </p>
                 <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-3">
-                  <a href={`${APP_URL}/request-access`} className="inline-flex items-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:brightness-110">
+                  <a href={`${APP_URL}/request-access`} className="inline-flex items-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-on-accent hover:bg-accent-hover">
                     Request access
                   </a>
                   <a href={`${APP_URL}/signin`} className="text-sm font-semibold text-steel hover:text-ink">
@@ -368,7 +369,7 @@ function Primary({ children, onClick }: { children: React.ReactNode; onClick: ()
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent transition hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
     >
       {children}
     </button>

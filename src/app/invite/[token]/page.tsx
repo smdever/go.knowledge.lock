@@ -39,7 +39,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
         {intro}
         <Link
           href={`/signin?email=${encodeURIComponent(invite.email)}&next=${encodeURIComponent(`/invite/${token}`)}`}
-          className="mt-6 inline-flex rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:brightness-110"
+          className="mt-6 inline-flex rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent hover:bg-accent-hover"
         >
           Sign in as {invite.email} to accept
         </Link>

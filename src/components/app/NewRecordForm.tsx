@@ -81,7 +81,7 @@ export default function NewRecordForm({
         <label htmlFor="statements" className="block text-sm font-semibold">
           {policy ? "Rules, one per line" : "What needs agreeing, one statement per line"}
         </label>
-        <p className="mt-1 text-sm text-ink/60">
+        <p className="mt-1 text-sm text-ink/70">
           {policy
             ? "Each line becomes a numbered rule (P1, P2…) that future records are checked against."
             : "Each line becomes a numbered statement (R1, R2…). Short, separate statements are easier to review and sign off."}
@@ -100,7 +100,7 @@ export default function NewRecordForm({
 
       <fieldset>
         <legend className="text-sm font-semibold">Who signs it off</legend>
-        <p className="mt-1 text-sm text-ink/60">Only owners and signers can be chosen. Each person signs from their own account.</p>
+        <p className="mt-1 text-sm text-ink/70">Only owners and signers can be chosen. Each person signs from their own account.</p>
         <ul className="mt-3 divide-y divide-ink/10 border-y border-ink/10">
           {candidates.map((c) => (
             <li key={c.userId}>
@@ -116,7 +116,7 @@ export default function NewRecordForm({
                   <span className="block truncate font-semibold">
                     {c.name} {c.userId === meId ? <span className="text-xs font-normal text-muted">(you)</span> : null}
                   </span>
-                  <span className="block truncate text-sm text-ink/60">{[c.title, c.email].filter(Boolean).join(" · ")}</span>
+                  <span className="block truncate text-sm text-ink/70">{[c.title, c.email].filter(Boolean).join(" · ")}</span>
                 </span>
               </label>
             </li>
@@ -140,12 +140,12 @@ export default function NewRecordForm({
               </option>
             ))}
           </select>
-          <span className="text-sm text-ink/60">An objection from anyone still blocks the lock.</span>
+          <span className="text-sm text-ink/70">An objection from anyone still blocks the lock.</span>
         </div>
       </div>
 
       {error ? (
-        <p role="alert" className="flex items-start gap-2 rounded-lg border border-bad/40 bg-bad/10 px-3 py-2.5 text-sm text-bad">
+        <p role="alert" className="flex items-start gap-2 rounded-lg border border-bad/40 bg-surface px-3 py-2.5 text-sm text-bad">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> {error}
         </p>
       ) : null}
@@ -153,7 +153,7 @@ export default function NewRecordForm({
       <button
         type="submit"
         disabled={busy || !chosen.length || !statements.length || statements.length > maxClaims}
-        className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50"
+        className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent hover:bg-accent-hover disabled:opacity-50"
       >
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
         Create draft

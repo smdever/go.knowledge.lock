@@ -12,18 +12,25 @@
   --color-warn: var(--warn);
   --color-bad: var(--bad);
   --color-surface: var(--surface);
+  --color-on-accent: var(--on-accent);
+  --color-accent-hover: var(--accent-hover);
 }
 
 @layer base {
   :root {
     --bg-main: #e0fbfc;
     --text-static: #293241;
-    --text-accent: #ee6c4d;
-    --text-inactive: rgba(61, 90, 128, 0.55);
+    /* Accent for text and filled buttons: a deeper sienna that passes 4.5:1 on the page and with white text.
+       The brand sienna #ee6c4d stays in the logo marks. */
+    --text-accent: #b8442a;
+    --accent-hover: #9e3a24;
+    --on-accent: #ffffff;
+    /* Secondary text (text-muted): steel at a strength that passes 4.5:1. */
+    --text-inactive: rgba(61, 90, 128, 0.85);
     --ambient-glow: rgba(152, 193, 217, 0.35);
     --steel: #3d5a80;
-    --good: #1f8a5b;
-    --warn: #b7791f;
+    --good: #1d7f54;
+    --warn: #9a661a;
     --bad: #c2412d;
     /* Solid card surface, so text never sits on stacked tints. */
     --surface: #ffffff;
@@ -33,13 +40,16 @@
     :root {
       --bg-main: #293241;
       --text-static: #e0fbfc;
-      --text-accent: #ee6c4d;
-      --text-inactive: rgba(152, 193, 217, 0.6);
+      /* Dark: a lighter sienna, with gunmetal text on filled accent buttons. */
+      --text-accent: #f28c73;
+      --accent-hover: #f49f8b;
+      --on-accent: #293241;
+      --text-inactive: rgba(152, 193, 217, 0.84);
       --ambient-glow: rgba(61, 90, 128, 0.35);
       --steel: #98c1d9;
       --good: #4cc38a;
       --warn: #e3b341;
-      --bad: #f2785c;
+      --bad: #f48971;
       --surface: #323d50;
     }
   }

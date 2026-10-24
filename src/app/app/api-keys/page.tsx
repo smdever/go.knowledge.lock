@@ -24,7 +24,7 @@ export default async function ApiKeysPage() {
 
       <section className="mt-8">
         <h2 className="text-lg font-semibold">Create a key</h2>
-        <p className="mt-1 text-sm text-ink/65">Use one key per agent or system, so you can revoke one without affecting the others.</p>
+        <p className="mt-1 text-sm text-ink/70">Use one key per agent or system, so you can revoke one without affecting the others.</p>
         <div className="mt-4">
           <ApiKeyForm action={createApiKeyAction} />
         </div>
@@ -38,7 +38,7 @@ export default async function ApiKeysPage() {
               <li key={k.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
                 <div className="min-w-0">
                   <p className="font-semibold">{k.name}</p>
-                  <p className="text-sm text-ink/60">
+                  <p className="text-sm text-ink/70">
                     <code className="font-mono text-xs">{k.prefix}…</code> · created {fmt(k.createdAt)}
                     {k.createdByName ? ` by ${k.createdByName}` : ""} · last used {fmt(k.lastUsedAt)}
                   </p>
@@ -51,7 +51,7 @@ export default async function ApiKeysPage() {
             ))}
           </ul>
         ) : (
-          <p className="mt-3 text-sm text-ink/60">No keys yet.</p>
+          <p className="mt-3 text-sm text-ink/70">No keys yet.</p>
         )}
       </section>
     </div>

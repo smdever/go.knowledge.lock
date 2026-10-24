@@ -14,7 +14,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   return (
     <PublicShell>
       {sp.error === "link" ? (
-        <p role="alert" className="mb-6 rounded-lg border border-bad/30 bg-bad/10 px-3 py-2.5 text-sm text-bad">
+        <p role="alert" className="mb-6 rounded-lg border border-bad/30 bg-surface px-3 py-2.5 text-sm text-bad">
           That sign-in link has expired or was already used. Request a new one below.
         </p>
       ) : null}

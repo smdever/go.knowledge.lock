@@ -190,7 +190,7 @@ function CreateIssues({ lockId, claimCount, onDone }: { lockId: string; claimCou
               <option key={p.key} value={p.key}>{p.name} ({p.key})</option>
             ))}
           </select>
-          <button type="button" onClick={create} disabled={busy || !project} className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-60">
+          <button type="button" onClick={create} disabled={busy || !project} className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-on-accent hover:bg-accent-hover disabled:opacity-60">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Create issues
           </button>
           <button type="button" onClick={() => setOpen(false)} className="text-sm font-semibold text-steel hover:text-ink">Cancel</button>
@@ -284,7 +284,7 @@ export default function JiraPanel({ lockId, claimCount }: { lockId: string; clai
             spellCheck={false}
             className="w-full rounded-lg border border-ink/15 bg-surface px-3 py-2 text-sm outline-none focus:border-accent sm:flex-1"
           />
-          <button type="submit" disabled={busy || !key.trim()} className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-60">
+          <button type="submit" disabled={busy || !key.trim()} className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-on-accent hover:bg-accent-hover disabled:opacity-60">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null} {busy ? "Checking" : "Check and link"}
           </button>
         </form>
@@ -306,7 +306,7 @@ export default function JiraPanel({ lockId, claimCount }: { lockId: string; clai
           ))}
         </ul>
       ) : (
-        <p className="mt-1 text-sm text-ink/60">None yet.</p>
+        <p className="mt-1 text-sm text-ink/70">None yet.</p>
       )}
 
       {panel.canEdit && panel.current ? (

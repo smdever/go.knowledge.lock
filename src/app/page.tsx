@@ -28,7 +28,7 @@ export default async function Home() {
         </p>
         <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3">
           <StartButton />
-          <span className="text-sm text-ink/60">No sign-up. Everything here is fictional.</span>
+          <span className="text-sm text-ink/70">No sign-up. Everything here is fictional.</span>
         </div>
       </section>
 
@@ -52,7 +52,7 @@ export default async function Home() {
             {STAKEHOLDERS.map((s) => (
               <li key={s.role} className="flex justify-between gap-3">
                 <span className="font-medium">{s.name}</span>
-                <span className="text-right text-ink/60">{s.title}</span>
+                <span className="text-right text-ink/70">{s.title}</span>
               </li>
             ))}
           </ul>
@@ -80,7 +80,7 @@ export default async function Home() {
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-3">
-          <a href={`${APP_URL}/request-access`} className="inline-flex items-center rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:brightness-110">
+          <a href={`${APP_URL}/request-access`} className="inline-flex items-center rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent hover:bg-accent-hover">
             Request access
           </a>
           <a href={`${APP_URL}/signin`} className="text-sm font-semibold text-steel hover:text-ink">

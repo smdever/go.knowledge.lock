@@ -39,7 +39,7 @@ export default async function AdminPage() {
         <h2 className="text-lg font-semibold">Organisations ({orgs.length})</h2>
         {orgs.length ? (
           <table className="mt-3 w-full text-left text-sm">
-            <thead className="text-ink/60">
+            <thead className="text-ink/70">
               <tr className="border-b border-ink/10">
                 <th className="py-2 font-semibold">Name</th>
                 <th className="py-2 font-semibold">People</th>
@@ -59,7 +59,7 @@ export default async function AdminPage() {
             </tbody>
           </table>
         ) : (
-          <p className="mt-3 text-sm text-ink/65">None yet.</p>
+          <p className="mt-3 text-sm text-ink/70">None yet.</p>
         )}
       </section>
     </div>

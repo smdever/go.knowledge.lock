@@ -16,7 +16,7 @@ function Row({ r }: { r: RecordSummary }) {
             {r.kind === "policy" ? <ShieldCheck className="h-4 w-4 shrink-0 text-steel" /> : <FileText className="h-4 w-4 shrink-0 text-steel" />}
             <span className="truncate">{r.title}</span>
           </span>
-          <span className="mt-0.5 block text-sm text-ink/60">
+          <span className="mt-0.5 block text-sm text-ink/70">
             v{r.version} ·{" "}
             {r.status === "locked"
               ? r.superseded
@@ -29,9 +29,9 @@ function Row({ r }: { r: RecordSummary }) {
         {r.status === "locked" ? (
           <Lock className="h-4 w-4 shrink-0 text-good" />
         ) : r.waitingOnMe ? (
-          <span className="shrink-0 rounded-full bg-accent/15 px-2.5 py-1 text-xs font-semibold text-accent">Needs you</span>
+          <span className="shrink-0 rounded-full bg-accent/[0.06] px-2.5 py-1 text-xs font-semibold text-accent">Needs you</span>
         ) : (
-          <ArrowRight className="h-4 w-4 shrink-0 text-ink/30" />
+          <ArrowRight className="h-4 w-4 shrink-0 text-ink/70" />
         )}
       </Link>
     </li>
@@ -50,7 +50,7 @@ function Section({ title, records, empty }: { title: string; records: RecordSumm
           ))}
         </ul>
       ) : (
-        <p className="mt-2 text-sm text-ink/60">{empty}</p>
+        <p className="mt-2 text-sm text-ink/70">{empty}</p>
       )}
     </section>
   );
@@ -69,7 +69,7 @@ export default async function AppHome() {
             <p className="mt-3 text-[15px] leading-relaxed text-ink/75">
               You&apos;re not in an organisation yet. Set up your first design partner and invite its owner.
             </p>
-            <Link href="/app/admin" className="mt-6 inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:brightness-110">
+            <Link href="/app/admin" className="mt-6 inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent hover:bg-accent-hover">
               Set up an organisation <ArrowRight className="h-4 w-4" />
             </Link>
           </>
@@ -95,7 +95,7 @@ export default async function AppHome() {
       <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{first ? `Welcome, ${first}` : "Welcome"}</h1>
         {canCreate ? (
-          <Link href="/app/records/new" className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:brightness-110">
+          <Link href="/app/records/new" className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-on-accent hover:bg-accent-hover">
             <Plus className="h-4 w-4" /> New record
           </Link>
         ) : null}
@@ -106,7 +106,7 @@ export default async function AppHome() {
       {!ctx.profile ? (
         <p className="mt-4 text-sm">
           <Link href="/app/profile" className="font-semibold text-accent hover:underline">Add your name and job title</Link>{" "}
-          <span className="text-ink/65">so colleagues know who signed what.</span>
+          <span className="text-ink/70">so colleagues know who signed what.</span>
         </p>
       ) : null}
 

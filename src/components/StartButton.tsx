@@ -29,7 +29,7 @@ export default function StartButton({ parentLockId, label = "Start the demo" }: 
         type="button"
         onClick={start}
         disabled={busy}
-        className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_18px_rgba(238,108,77,0.35)] transition hover:brightness-110 disabled:opacity-60"
+        className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent shadow-[0_4px_18px_rgba(238,108,77,0.35)] transition hover:bg-accent-hover disabled:opacity-60"
       >
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
         <span>{label}</span>

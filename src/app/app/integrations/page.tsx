@@ -67,7 +67,7 @@ export default async function IntegrationsPage() {
                   <dd className="text-ink/75">Issue: <strong>created</strong> and <strong>updated</strong>. Optionally limit it with JQL, such as <code className="font-mono text-xs">project = CLM</code>.</dd>
                 </div>
               </dl>
-              <p className="mt-3 text-sm text-ink/60">
+              <p className="mt-3 text-sm text-ink/70">
                 {jira.lastWebhookAt ? `Last heard from Jira ${fmt(jira.lastWebhookAt)}.` : "We haven't heard from Jira yet."} Only linked issues are
                 checked, only when their summary or description changes, and a comment is only added when the result changes.
               </p>
@@ -117,10 +117,10 @@ export default async function IntegrationsPage() {
                     <p className="font-semibold">
                       {c.name} <span className="ml-1 text-sm font-normal text-muted">{c.kind === "slack" ? "Slack" : "Teams"}</span>
                     </p>
-                    <p className="text-sm text-ink/60">
+                    <p className="text-sm text-ink/70">
                       <code className="font-mono text-xs">{c.hint}</code> · {c.events.map((e) => EVENT_LABEL[e]).join(", ")}
                     </p>
-                    <p className={`mt-1 text-sm ${c.paused || c.lastError ? "text-bad" : "text-ink/60"}`}>
+                    <p className={`mt-1 text-sm ${c.paused || c.lastError ? "text-bad" : "text-ink/70"}`}>
                       {c.paused
                         ? `Paused after ${c.failures} failed posts: ${c.lastError} Send a test to start it again.`
                         : c.lastError
@@ -142,7 +142,7 @@ export default async function IntegrationsPage() {
             ))}
           </ul>
         ) : (
-          <p className="mt-3 text-sm text-ink/60">None yet.</p>
+          <p className="mt-3 text-sm text-ink/70">None yet.</p>
         )}
       </section>
 

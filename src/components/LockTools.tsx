@@ -186,7 +186,7 @@ export function Build({ lockId, questions, sampleTicket }: { lockId: string; que
   }
 
   const tabClass = (t: string) =>
-    `inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold ${tab === t ? "bg-accent text-white" : "text-ink/70 hover:text-ink"}`;
+    `inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold ${tab === t ? "bg-accent text-on-accent" : "text-ink/70 hover:text-ink"}`;
 
   return (
     <Card>
@@ -217,7 +217,7 @@ export function Build({ lockId, questions, sampleTicket }: { lockId: string; que
               placeholder="Ask what this record says about something"
               className="w-full rounded-lg border border-ink/15 bg-bg/70 px-3 py-2 text-sm outline-none focus:border-accent"
             />
-            <button type="button" onClick={ask} disabled={busy || !question.trim()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+            <button type="button" onClick={ask} disabled={busy || !question.trim()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-on-accent disabled:opacity-60">
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Ask
             </button>
           </div>
@@ -253,7 +253,7 @@ export function Build({ lockId, questions, sampleTicket }: { lockId: string; que
             maxLength={4000}
             className="mt-1 w-full rounded-lg border border-ink/15 bg-bg/70 px-3 py-2 font-mono text-xs leading-relaxed outline-none focus:border-accent"
           />
-          <button type="button" onClick={check} disabled={busy || !ticket.trim()} className="mt-2 inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+          <button type="button" onClick={check} disabled={busy || !ticket.trim()} className="mt-2 inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-on-accent disabled:opacity-60">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <SearchCheck className="h-4 w-4" />} Check for drift
           </button>
           {drift ? (

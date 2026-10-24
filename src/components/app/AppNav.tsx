@@ -40,7 +40,7 @@ function UserBadge({ name, size = 32 }: { name: string; size?: number }) {
   return (
     <span
       aria-hidden="true"
-      className="flex shrink-0 items-center justify-center rounded-full bg-steel font-semibold text-white"
+      className="flex shrink-0 items-center justify-center rounded-full bg-steel font-semibold text-bg"
       style={{ width: size, height: size, fontSize: size * 0.38 }}
     >
       {initials(name) || "?"}

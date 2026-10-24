@@ -10,7 +10,7 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://guidedorchestratio
 export function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <span className="flex items-center gap-2 font-bold tracking-tight">
-      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-white">
+      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-on-accent">
         <Lock className="h-3.5 w-3.5" />
       </span>
       <span className={compact ? "hidden md:inline" : ""}>Knowledge Lock</span>

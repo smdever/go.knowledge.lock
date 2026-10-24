@@ -30,11 +30,11 @@ export default async function ActivityPage() {
       {groups.length ? (
         groups.map((g) => (
           <section key={g.day} className="mt-8">
-            <h2 className="text-sm font-semibold text-ink/60">{g.day}</h2>
+            <h2 className="text-sm font-semibold text-ink/70">{g.day}</h2>
             <ol className="mt-2 divide-y divide-ink/10 border-y border-ink/10">
               {g.items.map((i) => (
                 <li key={i.id} className="flex gap-4 py-3 text-[15px]">
-                  <time className="w-12 shrink-0 pt-px text-sm tabular-nums text-ink/55" dateTime={i.at.toISOString()}>
+                  <time className="w-12 shrink-0 pt-px text-sm tabular-nums text-ink/70" dateTime={i.at.toISOString()}>
                     {time(i.at)}
                   </time>
                   <div className="min-w-0">
@@ -48,7 +48,7 @@ export default async function ActivityPage() {
                         i.text
                       )}
                     </p>
-                    {i.note ? <p className="mt-0.5 text-sm text-ink/60">{i.note}</p> : null}
+                    {i.note ? <p className="mt-0.5 text-sm text-ink/70">{i.note}</p> : null}
                   </div>
                 </li>
               ))}
@@ -56,7 +56,7 @@ export default async function ActivityPage() {
           </section>
         ))
       ) : (
-        <p className="mt-8 text-sm text-ink/60">Nothing yet.</p>
+        <p className="mt-8 text-sm text-ink/70">Nothing yet.</p>
       )}
     </div>
   );

@@ -64,7 +64,7 @@ export default async function PoliciesPage() {
           {owner && !drafts.length ? (
             <Link
               href="/app/records/new?kind=policy"
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:brightness-110"
+              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent hover:bg-accent-hover"
             >
               Propose the policy <ArrowRight className="h-4 w-4" />
             </Link>

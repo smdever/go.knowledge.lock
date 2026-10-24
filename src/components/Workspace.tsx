@@ -307,7 +307,7 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
       {error ? (
         <div
           role="alert"
-          className="mt-6 flex items-start gap-2 rounded-lg border border-bad/40 bg-bad/10 px-3 py-2.5 text-sm text-bad"
+          className="mt-6 flex items-start gap-2 rounded-lg border border-bad/40 bg-surface px-3 py-2.5 text-sm text-bad"
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{error}</span>
@@ -355,7 +355,7 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
                   onChange={(e) => setItems(items.map((s, j) => (j === i ? e.target.value : s)))}
                   rows={Math.max(2, Math.ceil(statement.length / 70))}
                   maxLength={600}
-                  className="field-sizing-content w-full resize-none rounded-md border border-transparent bg-transparent px-2 py-1.5 text-[15px] leading-relaxed outline-none hover:border-ink/10 focus:border-accent/60 focus:bg-white/40"
+                  className="field-sizing-content w-full resize-none rounded-md border border-transparent bg-transparent px-2 py-1.5 text-[15px] leading-relaxed outline-none hover:border-ink/10 focus:border-accent/60 focus:bg-surface"
                 />
                 {canEdit ? (
                 <button
@@ -563,7 +563,7 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
             ))}
           </ul>
           {product && view.passkeys && !view.passkeys.mine && signers.some((s) => s.canSign) ? (
-            <p className={`mt-3 text-sm ${view.passkeys.required ? "text-bad" : "text-ink/65"}`}>
+            <p className={`mt-3 text-sm ${view.passkeys.required ? "text-bad" : "text-ink/70"}`}>
               {view.passkeys.required ? "You need a passkey to sign this. " : "Want your sign-off signed on your own device? "}
               <Link href="/app/profile#passkeys" className="font-semibold text-steel underline hover:text-ink">
                 Set up a passkey
@@ -734,7 +734,7 @@ function PrimaryButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
+      className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent transition hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
     >
       {children}
     </button>
@@ -770,7 +770,7 @@ function Disclosure({ label, children }: { label: string; children: React.ReactN
 function PolicyDrawer({ policy }: { policy: KnowledgeClaim[] }) {
   return (
     <Disclosure label={`The locked policy these must follow (${policy.length} rules)`}>
-      <ol className="space-y-2.5 rounded-lg bg-white/35 p-4">
+      <ol className="space-y-2.5 rounded-lg bg-surface p-4">
         {policy.map((c) => (
           <li key={c.id} className="flex gap-3 text-sm leading-relaxed text-ink/80">
             <span className="w-6 shrink-0 font-semibold text-steel">{c.id}</span>
@@ -835,7 +835,7 @@ function ReviewerRow({
           </motion.span>
         </AnimatePresence>
       </div>
-      {summary && state !== "running" ? <p className="mt-1 text-sm leading-relaxed text-ink/65">{summary}</p> : null}
+      {summary && state !== "running" ? <p className="mt-1 text-sm leading-relaxed text-ink/70">{summary}</p> : null}
     </li>
   );
 }
@@ -1109,7 +1109,7 @@ function SignerRow({
             maxLength={400}
             placeholder="What needs to change?"
             aria-label={`What ${signer.name} wants changed`}
-            className="w-full rounded-lg border border-ink/15 bg-white/40 px-3 py-2 text-sm outline-none focus:border-accent"
+            className="w-full rounded-lg border border-ink/15 bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
           />
           <div className="flex shrink-0 gap-2">
             <button
@@ -1122,7 +1122,7 @@ function SignerRow({
               }}
               disabled={Boolean(pending) || !comment.trim()}
               aria-busy={pending === "REJECT"}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-bad px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-bad px-3 py-2 text-sm font-semibold text-bg disabled:opacity-60"
             >
               {pending === "REJECT" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {pending === "REJECT" ? "Sending" : "Send"}
@@ -1141,7 +1141,7 @@ function Done({ ok, children }: { ok: boolean; children: React.ReactNode }) {
   return (
     <li className="flex items-start gap-2.5">
       {ok ? <Check className="mt-0.5 h-5 w-5 shrink-0 text-good" /> : <X className="mt-0.5 h-5 w-5 shrink-0 text-muted" />}
-      <span className={ok ? "" : "text-ink/60"}>{children}</span>
+      <span className={ok ? "" : "text-ink/70"}>{children}</span>
     </li>
   );
 }

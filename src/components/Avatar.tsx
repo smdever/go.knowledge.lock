@@ -43,7 +43,7 @@ export default function Avatar({
       </span>
       {signed ? (
         <span
-          className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center rounded-full bg-good text-white ring-2 ring-bg"
+          className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center rounded-full bg-good text-bg ring-2 ring-bg"
           style={{ width: Math.round(size * 0.42), height: Math.round(size * 0.42) }}
         >
           <Check style={{ width: Math.round(size * 0.28), height: Math.round(size * 0.28) }} strokeWidth={3} />

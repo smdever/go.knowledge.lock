@@ -14,7 +14,7 @@ export default async function ProfilePage() {
   return (
     <div className="max-w-xl">
       <h1 className="text-3xl font-semibold tracking-tight">Profile</h1>
-      <p className="mt-2 text-sm text-ink/65">Signed in as {ctx.user.email}</p>
+      <p className="mt-2 text-sm text-ink/70">Signed in as {ctx.user.email}</p>
       <div className="mt-8 max-w-md">
         <ProfileForm action={saveProfileAction} name={ctx.profile?.name} title={ctx.profile?.title} submit="Save" />
         <div className="mt-8">
@@ -35,7 +35,7 @@ export default async function ProfilePage() {
               <li key={k.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
                 <div className="min-w-0">
                   <p className="font-semibold">{k.name}</p>
-                  <p className="text-sm text-ink/60">
+                  <p className="text-sm text-ink/70">
                     Added {fmt(k.createdAt)} · {k.lastUsedAt ? `last used ${fmt(k.lastUsedAt)}` : "not used yet"}
                     {k.synced ? " · available on your other devices" : " · this device only"}
                   </p>
@@ -52,7 +52,7 @@ export default async function ProfilePage() {
           <AddPasskeyButton first={!passkeys.length} />
         </div>
         {passkeys.length ? (
-          <p className="mt-3 text-sm text-ink/60">
+          <p className="mt-3 text-sm text-ink/70">
             Removing a passkey withdraws any sign-offs it made on records that aren&apos;t locked yet. Locked records keep their
             signatures.
           </p>

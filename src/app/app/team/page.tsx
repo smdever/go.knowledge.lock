@@ -25,7 +25,7 @@ export default async function TeamPage() {
       {owner ? (
         <section className="mt-8">
           <h2 className="text-lg font-semibold">Invite someone</h2>
-          <p className="mt-1 text-sm text-ink/65">They&apos;ll get an email with a link that works for 7 days.</p>
+          <p className="mt-1 text-sm text-ink/70">They&apos;ll get an email with a link that works for 7 days.</p>
           <div className="mt-4">
             <InviteForm action={inviteAction} />
           </div>
@@ -45,7 +45,7 @@ export default async function TeamPage() {
                     <p className="truncate font-semibold">
                       {m.name || m.email} {me ? <span className="text-xs font-normal text-muted">(you)</span> : null}
                     </p>
-                    <p className="truncate text-sm text-ink/60">
+                    <p className="truncate text-sm text-ink/70">
                       {[m.title, m.email].filter(Boolean).join(" · ")} · joined {fmt(m.joinedAt)}
                       {m.role !== "viewer" ? (withKeys.has(m.userId) ? " · has a passkey" : " · no passkey yet") : ""}
                     </p>
@@ -73,7 +73,7 @@ export default async function TeamPage() {
               <li key={i.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
                 <span>
                   <span className="font-semibold">{i.email}</span>
-                  <span className="text-ink/60"> · {ROLE_LABEL[i.role]} · expires {fmt(i.expiresAt)}</span>
+                  <span className="text-ink/70"> · {ROLE_LABEL[i.role]} · expires {fmt(i.expiresAt)}</span>
                 </span>
                 <form action={revokeInviteAction}>
                   <input type="hidden" name="inviteId" value={i.id} />
@@ -88,7 +88,7 @@ export default async function TeamPage() {
       {owner ? (
         <section className="mt-10">
           <h2 className="text-lg font-semibold">Personal signatures</h2>
-          <p className="mt-1 max-w-2xl text-sm text-ink/65">
+          <p className="mt-1 max-w-2xl text-sm text-ink/70">
             Anyone with a passkey already signs their sign-offs with it. You can make it a rule, so a sign-off only counts when it is
             signed on the person&apos;s own device.
           </p>

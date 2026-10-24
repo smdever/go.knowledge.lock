@@ -21,7 +21,7 @@ export function Submit({ children, className = "" }: { children: React.ReactNode
     <button
       type="submit"
       disabled={pending}
-      className={`inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60 ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent transition hover:bg-accent-hover disabled:opacity-60 ${className}`}
     >
       {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
       {children}
@@ -253,7 +253,7 @@ export function AddPasskeyButton({ first }: { first: boolean }) {
         type="button"
         onClick={add}
         disabled={busy}
-        className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
+        className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent transition hover:bg-accent-hover disabled:opacity-60"
       >
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
         {first ? "Set up a passkey" : "Add another passkey"}
@@ -271,7 +271,7 @@ export function RequirePasskeysForm({ action, on }: { action: Action; on: boolea
         <input type="checkbox" name="require" defaultChecked={on} className="mt-1 h-4 w-4 accent-accent" />
         <span>
           <span className="font-semibold">Require a passkey for every sign-off</span>
-          <span className="block text-sm text-ink/65">
+          <span className="block text-sm text-ink/70">
             Applies to records started after you save. Drafts already under way keep their current rule. Make sure your signers
             have set up a passkey on their Profile page first.
           </span>
@@ -317,7 +317,7 @@ export function AddChannelForm({ action }: { action: Action }) {
         <legend className="text-sm font-semibold">Where</legend>
         <div className="mt-2 flex gap-2">
           {(["slack", "teams"] as const).map((k) => (
-            <label key={k} className={`cursor-pointer rounded-lg border px-4 py-2 text-sm font-semibold ${kind === k ? "border-accent text-ink" : "border-ink/20 text-ink/60"}`}>
+            <label key={k} className={`cursor-pointer rounded-lg border px-4 py-2 text-sm font-semibold ${kind === k ? "border-accent text-ink" : "border-ink/20 text-ink/70"}`}>
               <input type="radio" name="kind" value={k} checked={kind === k} onChange={() => setKind(k)} className="sr-only" />
               {k === "slack" ? "Slack" : "Microsoft Teams"}
             </label>
@@ -348,7 +348,7 @@ export function AddChannelForm({ action }: { action: Action }) {
               <input type="checkbox" name="events" value={e.id} defaultChecked className="mt-1 h-4 w-4 accent-accent" />
               <span>
                 {e.label}
-                <span className="block text-sm text-ink/60">{e.help}</span>
+                <span className="block text-sm text-ink/70">{e.help}</span>
               </span>
             </label>
           ))}
@@ -404,7 +404,7 @@ export function RequestAccessForm({ action }: { action: Action }) {
           Knowledge Lock is open to a small group of design partners. Tell us a little about you and we&apos;ll be in touch. If
           your organisation already uses it, ask one of its owners to invite you instead.
         </p>
-        <p className="mt-2 text-sm text-ink/65">
+        <p className="mt-2 text-sm text-ink/70">
           Want to look around first?{" "}
           <a href={DEMO_URL} className="font-semibold text-steel underline hover:text-ink">Try the interactive demo</a>. No
           sign-up, about three minutes.
@@ -488,7 +488,7 @@ export function AccessRequests({
                     {r.title ? <span className="font-normal text-ink/70">, {r.title}</span> : null}
                     <span className="font-normal text-ink/70"> at {r.company}</span>
                   </p>
-                  <p className="text-sm text-ink/60">
+                  <p className="text-sm text-ink/70">
                     <a href={`mailto:${r.email}`} className="hover:text-ink">{r.email}</a> · {r.created}
                   </p>
                   {r.message ? <p className="mt-2 max-w-2xl whitespace-pre-line text-sm text-ink/80">&ldquo;{r.message}&rdquo;</p> : null}
@@ -512,7 +512,7 @@ export function AccessRequests({
           ))}
         </ul>
       ) : (
-        <p className="mt-3 text-sm text-ink/65">No requests waiting. People can ask for access from the sign-in page.</p>
+        <p className="mt-3 text-sm text-ink/70">No requests waiting. People can ask for access from the sign-in page.</p>
       )}
     </div>
   );
@@ -555,7 +555,7 @@ export function ToggleForm({ action, name, on, label, help }: { action: Action; 
         <input type="checkbox" name={name} defaultChecked={on} className="mt-1 h-4 w-4 accent-accent" />
         <span>
           <span className="font-semibold">{label}</span>
-          <span className="block text-sm text-ink/65">{help}</span>
+          <span className="block text-sm text-ink/70">{help}</span>
         </span>
       </label>
       <Submit className="mt-3">Save</Submit>
