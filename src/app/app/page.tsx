@@ -1,8 +1,77 @@
 import Link from "next/link";
-import { Archive, ArrowRight, Check, ChevronDown, FileText, Lock, Plus, ShieldCheck } from "lucide-react";
+import { Archive, ArrowRight, ArrowUpRight, Check, ChevronDown, FileText, Lock, Plus, ShieldCheck } from "lucide-react";
+import { dismissOnboardingAction } from "@/app/app/actions";
+import { getOnboarding, type Onboarding } from "@/lib/app/onboarding";
 import { getContext } from "@/lib/app/context";
 import { listRecords, type RecordSummary } from "@/lib/app/records";
 import { ROLE_HELP, withArticle } from "@/lib/app/roles";
+
+const DEMO_URL = (process.env.NEXT_PUBLIC_KL_DEMO_URL || "https://knowledge-lock.com").replace(/\/$/, "");
+
+/** Owners see this until their organisation locks its first record. */
+function GettingStarted({ o }: { o: Onboarding }) {
+  const next = o.steps.find((s) => !s.done && !s.optional) ?? o.steps.find((s) => !s.done);
+  return (
+    <section aria-labelledby="getting-started" className="mt-8 rounded-2xl border border-ink/15 bg-surface p-5 shadow-[0_1px_2px_rgba(41,50,65,0.06)] sm:p-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h2 id="getting-started" className="text-lg font-semibold">Get started</h2>
+        <p className="text-sm text-ink/70">
+          {o.done} of {o.total} done
+        </p>
+      </div>
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink/10" aria-hidden="true">
+        <div className="h-full rounded-full bg-good" style={{ width: `${Math.round((o.done / o.total) * 100)}%` }} />
+      </div>
+      <ol className="mt-4 divide-y divide-ink/10">
+        {o.steps.map((s, i) => {
+          const isNext = s === next;
+          return (
+            <li key={s.id} className="flex items-start gap-3 py-3">
+              <span
+                className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                  s.done ? "bg-good text-bg" : isNext ? "border-2 border-accent text-accent" : "border border-ink/30 text-ink/70"
+                }`}
+              >
+                {s.done ? <Check className="h-3.5 w-3.5" aria-label="Done" /> : i + 1}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex flex-wrap items-baseline gap-x-2">
+                  {s.done ? (
+                    <span className="font-semibold text-ink/70">{s.label}</span>
+                  ) : (
+                    <Link href={s.href} className="font-semibold hover:underline">
+                      {s.label}
+                    </Link>
+                  )}
+                  {s.optional && !s.done ? <span className="text-xs text-ink/70">Optional</span> : null}
+                </span>
+                {!s.done ? <span className="mt-0.5 block text-sm text-ink/70">{s.help}</span> : null}
+              </span>
+              {isNext ? (
+                <Link
+                  href={s.href}
+                  className="hidden shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3.5 py-1.5 text-sm font-semibold text-on-accent hover:bg-accent-hover sm:inline-flex"
+                >
+                  Start <ArrowRight className="h-4 w-4" />
+                </Link>
+              ) : null}
+            </li>
+          );
+        })}
+      </ol>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-ink/10 pt-4 text-sm">
+        <a href={DEMO_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-steel hover:text-ink">
+          Practise first in the interactive demo <ArrowUpRight className="h-4 w-4" />
+        </a>
+        <form action={dismissOnboardingAction}>
+          <button type="submit" className="font-semibold text-ink/70 hover:text-ink">
+            Hide this list
+          </button>
+        </form>
+      </div>
+    </section>
+  );
+}
 
 const fmt = (d: Date) => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(d);
 
@@ -95,6 +164,7 @@ export default async function AppHome() {
   const locked = records.filter((r) => r.status === "locked" && !r.superseded && !r.retired);
   const archived = records.filter((r) => r.archived || (r.retired && !r.superseded));
   const canCreate = org.role !== "viewer";
+  const onboarding = await getOnboarding(org.orgId, ctx.user.id, org.role);
 
   return (
     <div className="max-w-3xl">
@@ -110,7 +180,8 @@ export default async function AppHome() {
       <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-ink/75">
         You&apos;re {withArticle(org.role)} here, so you can {ROLE_HELP[org.role]}.
       </p>
-      {!ctx.profile ? (
+      {onboarding ? <GettingStarted o={onboarding} /> : null}
+      {!ctx.profile && !onboarding ? (
         <p className="mt-4 text-sm">
           <Link href="/app/profile" className="font-semibold text-accent hover:underline">Add your name and job title</Link>{" "}
           <span className="text-ink/70">so colleagues know who signed what.</span>
@@ -128,7 +199,7 @@ export default async function AppHome() {
       <Section
         title="Locked"
         records={locked}
-        empty={canCreate ? "Nothing locked yet. Start with a new record, or propose your policy first." : "Nothing locked yet."}
+        empty={canCreate ? "Nothing locked yet. Start with a new record, or from a template." : "Nothing locked yet."}
       />
       {archived.length ? (
         <details className="group mt-10">

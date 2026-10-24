@@ -248,6 +248,11 @@ export interface OrgSummary {
   members: number;
   pendingInvites: number;
   createdAt: Date;
+  /** When the first owner joined, and when the first record was started and locked. For measuring onboarding. */
+  ownerJoinedAt: Date | null;
+  firstRecordAt: Date | null;
+  firstLockAt: Date | null;
+  remindedAt: Date | null;
 }
 
 export async function listOrganisations(): Promise<OrgSummary[]> {
@@ -255,7 +260,11 @@ export async function listOrganisations(): Promise<OrgSummary[]> {
   return db<OrgSummary[]>`
     SELECT o.id, o.name, o.created_at AS "createdAt",
       (SELECT count(*)::int FROM kl_members m WHERE m.org_id = o.id) AS members,
-      (SELECT count(*)::int FROM kl_invites i WHERE i.org_id = o.id AND i.accepted_at IS NULL AND i.revoked_at IS NULL AND i.expires_at > now()) AS "pendingInvites"
+      (SELECT count(*)::int FROM kl_invites i WHERE i.org_id = o.id AND i.accepted_at IS NULL AND i.revoked_at IS NULL AND i.expires_at > now()) AS "pendingInvites",
+      (SELECT min(m.created_at) FROM kl_members m WHERE m.org_id = o.id AND m.role = 'owner') AS "ownerJoinedAt",
+      (SELECT min(a.at) FROM kl_audit a WHERE a.org_id = o.id AND a.action = 'record.created') AS "firstRecordAt",
+      (SELECT min(a.at) FROM kl_audit a WHERE a.org_id = o.id AND a.action = 'record.locked' AND a.detail->>'kind' = 'requirements') AS "firstLockAt",
+      o.onboarding_reminded_at AS "remindedAt"
     FROM kl_organisations o ORDER BY o.created_at DESC`;
 }
 

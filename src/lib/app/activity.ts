@@ -89,6 +89,8 @@ export async function listActivity(orgId: string, limit = 200): Promise<Activity
         return { ...base, text: `revoked the API key "${r.target}"` };
       case "api.export":
         return { ...base, actor: `API key "${String(d.key ?? "")}"`, text: "exported all locked records" };
+      case "org.onboarding_reminder":
+        return { ...base, actor: "Knowledge Lock", text: d.draft ? "emailed the owners a reminder to finish their first record" : "emailed the owners a reminder to start their first record" };
       case "record.created":
         return { ...base, text: `created ${record}${v}`, href: recordHref };
       case "record.reviewed":

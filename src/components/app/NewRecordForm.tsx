@@ -18,16 +18,21 @@ export default function NewRecordForm({
   candidates,
   meId,
   maxClaims,
+  initialTitle,
+  initialStatements,
 }: {
   kind: "requirements" | "policy";
   candidates: Candidate[];
   meId: string;
   maxClaims: number;
+  /** From a template: a starting point the person edits. */
+  initialTitle?: string;
+  initialStatements?: string[];
 }) {
   const router = useRouter();
   const policy = kind === "policy";
-  const [title, setTitle] = useState(policy ? "Organisation policy" : "");
-  const [text, setText] = useState("");
+  const [title, setTitle] = useState(initialTitle ?? (policy ? "Organisation policy" : ""));
+  const [text, setText] = useState(initialStatements?.join("\n") ?? "");
   const [chosen, setChosen] = useState<string[]>(() => candidates.map((c) => c.userId));
   const [quorum, setQuorum] = useState(candidates.length);
   const [busy, setBusy] = useState(false);
@@ -101,6 +106,13 @@ export default function NewRecordForm({
       <fieldset>
         <legend className="text-sm font-semibold">Who signs it off</legend>
         <p className="mt-1 text-sm text-ink/70">Only owners and signers can be chosen. Each person signs from their own account.</p>
+        {candidates.length === 1 && candidates[0].userId === meId ? (
+          <p className="mt-3 rounded-lg border border-steel/40 bg-surface px-3 py-2.5 text-sm leading-relaxed text-ink/80">
+            You&apos;re the only signer so far, so you can lock this on your own to see the whole flow. Invite colleagues under{" "}
+            <a href="/app/team" className="font-semibold text-steel underline hover:text-ink">Team</a>, and they can sign off your next
+            record or a new version of this one.
+          </p>
+        ) : null}
         <ul className="mt-3 divide-y divide-ink/10 border-y border-ink/10">
           {candidates.map((c) => (
             <li key={c.userId}>

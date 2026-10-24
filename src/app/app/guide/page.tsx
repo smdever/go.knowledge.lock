@@ -79,9 +79,16 @@ export default async function GuidePage() {
           </li>
           <li>
             Create your first <Link href="/app/records/new" className="font-semibold text-steel hover:text-ink">record</Link>.
-            Pick something real but small: five to ten statements that several teams need to agree.
+            Pick something real but small: five to ten statements that several teams need to agree. Templates give you example
+            wording to edit, and you can lock it on your own to see the whole flow.
           </li>
         </ol>
+      ) : null}
+      {owner ? (
+        <P>
+          Until your organisation locks its first record, owners see a <strong>Get started</strong> list on the home page that ticks
+          itself off as you go. If nothing is locked a few days after you join, we send one reminder email.
+        </P>
       ) : (
         <P>
           Your organisation&apos;s owner sets things up. As a signer you&apos;ll get an email when your sign-off is needed. You can

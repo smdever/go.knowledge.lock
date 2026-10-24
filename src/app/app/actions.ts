@@ -30,6 +30,7 @@ import { connectJira, disconnectJira, setAutoCheck } from "@/lib/app/jira";
 import { appDb } from "@/lib/app/db";
 import { closeAccessRequest, getAccessRequest, submitAccessRequest } from "@/lib/app/access";
 import { withdrawPasskeySignOffs } from "@/lib/app/records";
+import { dismissOnboarding } from "@/lib/app/onboarding";
 
 export interface FormState {
   error?: string;
@@ -385,4 +386,10 @@ export async function setJiraAutoCheckAction(_prev: FormState, fd: FormData): Pr
     revalidatePath("/app/integrations");
     return { message: on ? "Linked issues will be re-checked when they change." : "Automatic checks are off." };
   });
+}
+
+export async function dismissOnboardingAction() {
+  const { user, current } = await ownerOrg();
+  await dismissOnboarding(current.orgId, user);
+  revalidatePath("/app");
 }
