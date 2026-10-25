@@ -1,10 +1,10 @@
 # Deploying the demo (Vercel + Postgres)
 
 ## 1. Push the branch
-Push `demo-v2` to GitHub (private repo is fine).
+Both the demo and the product deploy from `main`. They are the same code; `KL_MODE` decides which one runs.
 
 ## 2. Create the Vercel project
-1. https://vercel.com/new, import the repo, select the `demo-v2` branch (or merge it to `main` first).
+1. https://vercel.com/new, import the repo, and use `main` as the production branch.
 2. Framework preset: Next.js. No build settings to change.
 
 ## 3. Add Postgres (Supabase or Neon)
