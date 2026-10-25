@@ -10,6 +10,7 @@ import type { KnowledgeClaim } from "@/lib/protocol";
 import type { FixSuggestion, ProviderId, RecordView, ReviewIssue, SignerView } from "@/lib/demo/types";
 import { useKL } from "./KLContext";
 import { ArchiveDraftButton } from "./app/RetireControls";
+import WhatChanged from "./WhatChanged";
 
 const PROVIDER_LABEL: Record<ProviderId, string> = { anthropic: "Anthropic", openai: "OpenAI", google: "Google" };
 
@@ -553,6 +554,7 @@ export default function Workspace({ initial, policy }: { initial: RecordView; po
                 : "Each person approves this exact wording. In a pilot they'd each sign in from their own account; here you can act for all three."
             }
           />
+          <WhatChanged record={record} />
           <ul className="mt-6 divide-y divide-ink/10 border-y border-ink/10">
             {signers.map((s) => (
               <SignerRow

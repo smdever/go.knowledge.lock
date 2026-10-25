@@ -207,9 +207,16 @@ export async function createRecord(parentLockId?: string): Promise<DemoRecord> {
     attestations: [],
     modelReviews: [],
     resolutions: [],
+    ...(parentLockId ? { baseline: { source: "previous-version" as const, at: now, claims: claims.map((c) => ({ id: c.id, statement: c.statement })) } } : {}),
   };
   await store.saveRecord(record);
   return record;
+}
+
+/** The first time a draft is reviewed, keep its wording so signers can see what changed (see Baseline). */
+export function keepBaseline(record: Pick<DemoRecord, "baseline" | "payload">): void {
+  if (record.baseline) return;
+  record.baseline = { source: "first-review", at: Date.now(), claims: record.payload.claims.map((c) => ({ id: c.id, statement: c.statement })) };
 }
 
 /**
@@ -363,6 +370,7 @@ export async function runReview(id: string, ip: string): Promise<DemoRecord> {
     throw new DemoError("The requirements changed during review. Run the review again.", 409);
   }
 
+  keepBaseline(latest);
   mergeReviews(latest, reviews);
   latest.updatedAt = Date.now();
   await getStore().saveRecord(latest);

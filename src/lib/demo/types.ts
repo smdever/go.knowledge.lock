@@ -70,6 +70,17 @@ export interface DemoRecord {
   attestations: Attestation[];
   modelReviews: ModelReview[];
   resolutions?: Resolution[];
+  /**
+   * The wording signers compare against on the sign-off step: the wording first sent for AI review, or for a
+   * later version, the previous locked version. Not part of the signed payload.
+   */
+  baseline?: Baseline;
+}
+
+export interface Baseline {
+  source: "first-review" | "previous-version";
+  at: number;
+  claims: { id: string; statement: string }[];
 }
 
 /** What the API returns for a record: the record plus a live consensus evaluation. */

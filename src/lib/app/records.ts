@@ -27,6 +27,7 @@ import {
   chargeUsage,
   DemoError,
   fixHint,
+  keepBaseline,
   MAX_QUESTION,
   MAX_STATEMENT,
   MAX_TITLE,
@@ -420,6 +421,7 @@ export async function createRecord(
       payloadHash: "",
     };
     const claims = parent.block.payload.claims.map((c) => ({ id: c.id, statement: c.statement }));
+    record.baseline = { source: "previous-version", at: now, claims };
     record.payload = buildPayload(record, org.name, parent.block.payload.title, claims, org.policyLockId);
     record.payloadHash = await computeCanonicalPayloadHash(record.payload);
     await saveRecord(record);
@@ -513,6 +515,7 @@ export async function runReview(user: AppUser, id: string): Promise<AppRecord> {
   if (!latest || latest.payloadHash !== record.payloadHash || latest.status !== "draft") {
     throw new DemoError("The wording changed during review. Run the review again.", 409);
   }
+  keepBaseline(latest);
   mergeReviews(latest, reviews);
   latest.updatedAt = Date.now();
   await askForSignOffs(latest, org, user);
