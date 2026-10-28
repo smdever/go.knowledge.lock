@@ -1,0 +1,48 @@
+# Knowledge Lock for Confluence: a proof of concept, installed privately on our own Confluence site.
+# Replace app.id with the ID `forge register` gives you before the first deploy.
+modules:
+  # The label near the page title (R3). Its text is set for each page view by byline-props; selecting it opens the panel.
+  confluence:contentBylineItem:
+    - key: kl-byline
+      title: Knowledge Lock
+      tooltip: Link this page to a locked record in Knowledge Lock
+      resource: panel
+      render: native
+      resolver:
+        function: resolver
+      viewportSize: medium
+      dynamicProperties:
+        function: byline-props
+  # Settings, shown by Confluence to site administrators only (R1).
+  confluence:globalSettings:
+    - key: kl-settings
+      title: Knowledge Lock
+      resource: settings
+      render: native
+      resolver:
+        function: resolver
+  function:
+    - key: resolver
+      handler: index.handler
+    - key: byline-props
+      handler: index.bylineProps
+resources:
+  - key: panel
+    path: src/frontend/panel.tsx
+  - key: settings
+    path: src/frontend/settings.tsx
+# Only what the app needs (R13): read pages and blog posts, keep its own storage, and call Knowledge Lock.
+# No scope lets it write to Confluence.
+permissions:
+  scopes:
+    - read:page:confluence
+    - read:blogpost:confluence
+    - storage:app
+  external:
+    fetch:
+      backend:
+        - address: app.knowledge-lock.com
+app:
+  id: ari:cloud:ecosystem::app/00000000-0000-0000-0000-000000000000
+  runtime:
+    name: nodejs22.x

@@ -161,7 +161,7 @@ export async function currentRetirement(lockId: string): Promise<Retirement | nu
 }
 
 /** The newest version in a lock's chain. */
-async function newestVersion(lockId: string): Promise<string> {
+export async function newestVersion(lockId: string): Promise<string> {
   let id = lockId;
   for (let i = 0; i < 50; i++) {
     const next = await postgresStore.getSupersededBy(id);

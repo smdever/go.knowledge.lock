@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The Confluence app is its own Forge project, with its own packages and checks.
+    "integrations/**",
   ]),
 ]);
 

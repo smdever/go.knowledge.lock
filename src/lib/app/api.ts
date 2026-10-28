@@ -12,20 +12,21 @@ export interface ApiCaller {
 
 /**
  * Public API wrapper: an organisation API key is required, every request counts towards the key's
- * hourly limit, and errors come back as `{ "error": "…" }` with a meaningful status.
+ * hourly limit, and errors come back as `{ "error": "…" }` with a meaningful status. Errors an app needs
+ * to tell apart also carry a `code`: invalid_key, org_closing, retired, not_found or rate_limited.
  */
 export async function apiHandle<T>(request: Request, fn: (caller: ApiCaller) => Promise<T>, opts: { audit?: string } = {}) {
   const caller = await keyFromRequest(request);
   if (!caller) {
     return NextResponse.json(
-      { error: "Missing or invalid API key. Send it as: Authorization: Bearer kl_live_…" },
+      { error: "Missing or invalid API key. Send it as: Authorization: Bearer kl_live_…", code: "invalid_key" },
       { status: 401, headers: { "WWW-Authenticate": "Bearer" } }
     );
   }
   const closing = await closingDate(caller.orgId);
   if (closing) {
     return NextResponse.json(
-      { error: `${closing.name} is closing on Knowledge Lock, so the API is switched off. Everything will be deleted on ${longDate(closing.deleteAfter)}.` },
+      { error: `${closing.name} is closing on Knowledge Lock, so the API is switched off. Everything will be deleted on ${longDate(closing.deleteAfter)}.`, code: "org_closing" },
       { status: 403 }
     );
   }
@@ -42,7 +43,8 @@ export async function apiHandle<T>(request: Request, fn: (caller: ApiCaller) => 
     return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     if (err instanceof DemoError) {
-      return NextResponse.json({ error: err.message }, { status: err.status, ...(err.status === 429 ? { headers: { "Retry-After": "3600" } } : {}) });
+      const code = err.status === 410 ? "retired" : err.status === 429 ? "rate_limited" : err.status === 404 ? "not_found" : undefined;
+      return NextResponse.json({ error: err.message, ...(code ? { code } : {}) }, { status: err.status, ...(err.status === 429 ? { headers: { "Retry-After": "3600" } } : {}) });
     }
     if (err instanceof AppError) return NextResponse.json({ error: err.message }, { status: 400 });
     console.error("[knowledge-lock] api", err);

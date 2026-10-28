@@ -89,6 +89,17 @@ export async function listActivity(orgId: string, limit = 200): Promise<Activity
         return { ...base, text: `revoked the API key "${r.target}"` };
       case "api.export":
         return { ...base, actor: `API key "${String(d.key ?? "")}"`, text: "exported all locked records" };
+      case "api.check": {
+        const where = d.source === "confluence" ? `a Confluence page${typeof d.site === "string" ? ` (${d.site.replace(/^https?:\/\//, "")})` : ""}` : "some work";
+        const n = Number(d.findings ?? 0);
+        return {
+          ...base,
+          actor: `API key "${String(d.key ?? "")}"`,
+          text: `checked ${where} against v${Number(d.version ?? 1)} of a locked record`,
+          note: n ? `${n} finding${n === 1 ? "" : "s"}` : "Nothing departing found",
+          href: r.target ? `/app/l/${r.target}` : undefined,
+        };
+      }
       case "org.onboarding_reminder":
         return { ...base, actor: "Knowledge Lock", text: d.draft ? "emailed the owners a reminder to finish their first record" : "emailed the owners a reminder to start their first record" };
       case "member.left":
