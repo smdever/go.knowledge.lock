@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { FilePenLine, Hammer, Lock, Users } from "lucide-react";
 import Shell, { APP_URL, Card } from "@/components/Shell";
@@ -6,6 +7,13 @@ import { ensurePolicyLock } from "@/lib/demo/service";
 import { DRAFT_TITLE, ORG_NAME, POLICY_PAYLOAD, STAKEHOLDERS } from "@/lib/demo/scenario";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Interactive demo | Knowledge Lock",
+  description:
+    "Walk through a full sign-off at a fictional bank: AI models catch a policy breach, stakeholders sign off, then the agreed version is locked and built from. No sign-up, about three minutes.",
+  alternates: { canonical: `${(process.env.NEXT_PUBLIC_KL_DEMO_URL || "https://knowledge-lock.com").replace(/\/$/, "")}/demo` },
+};
 
 const STEPS = [
   { icon: FilePenLine, title: "Propose", text: "Start from a draft set of requirements. One of them quietly breaks the bank's policy." },

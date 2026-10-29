@@ -10,7 +10,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-40 border-b border-ink/10 bg-bg/85 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-          <Link href="/" className="flex min-w-0 items-center gap-2 font-bold tracking-tight">
+          <Link href="/demo" className="flex min-w-0 items-center gap-2 font-bold tracking-tight">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-on-accent">
               <Lock className="h-3.5 w-3.5" />
             </span>
