@@ -6,7 +6,7 @@ import { getContext } from "@/lib/app/context";
 import { listRecords, type RecordSummary } from "@/lib/app/records";
 import { ROLE_HELP, withArticle } from "@/lib/app/roles";
 
-const DEMO_URL = (process.env.NEXT_PUBLIC_KL_DEMO_URL || "https://knowledge-lock.com").replace(/\/$/, "");
+const DEMO_URL = `${(process.env.NEXT_PUBLIC_KL_DEMO_URL || "https://knowledge-lock.com").replace(/\/$/, "")}/demo`;
 
 /** Owners see this until their organisation locks its first record. */
 function GettingStarted({ o }: { o: Onboarding }) {

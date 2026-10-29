@@ -10,7 +10,7 @@ import { addPasskey } from "@/lib/app/passkey-client";
 
 type Action = (prev: FormState, fd: FormData) => Promise<FormState>;
 
-const DEMO_URL = (process.env.NEXT_PUBLIC_KL_DEMO_URL || "https://knowledge-lock.com").replace(/\/$/, "");
+const DEMO_URL = `${(process.env.NEXT_PUBLIC_KL_DEMO_URL || "https://knowledge-lock.com").replace(/\/$/, "")}/demo`;
 
 export const inputClass =
   "w-full rounded-lg border border-ink/20 bg-transparent px-3 py-2.5 text-[15px] outline-none focus:border-accent";
