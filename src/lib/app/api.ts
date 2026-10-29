@@ -31,13 +31,7 @@ export async function apiHandle<T>(request: Request, fn: (caller: ApiCaller) => 
     );
   }
   try {
-    await chargeUsage(`apikey:${caller.keyId}`, 1, {
-      perHour: Number(process.env.KL_API_HOURLY_LIMIT || 1000),
-      perDay: Number(process.env.KL_API_DAILY_LIMIT || 10000),
-      dayKey: `api-org:${caller.orgId}`,
-      hourMessage: "This key has reached its hourly request limit. Try again later.",
-      dayMessage: "Your organisation has reached its daily API limit. Try again tomorrow.",
-    });
+    await chargeApiKey(caller);
     const result = await fn(caller);
     if (opts.audit) await audit(caller.orgId, null, opts.audit, undefined, { key: caller.name });
     return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
@@ -50,6 +44,17 @@ export async function apiHandle<T>(request: Request, fn: (caller: ApiCaller) => 
     console.error("[knowledge-lock] api", err);
     return NextResponse.json({ error: "Something went wrong. Please try again." }, { status: 500 });
   }
+}
+
+/** Counts one request towards the key's hourly limit and the organisation's daily limit (the API and the MCP server share them). */
+export function chargeApiKey(caller: ApiCaller) {
+  return chargeUsage(`apikey:${caller.keyId}`, 1, {
+    perHour: Number(process.env.KL_API_HOURLY_LIMIT || 1000),
+    perDay: Number(process.env.KL_API_DAILY_LIMIT || 10000),
+    dayKey: `api-org:${caller.orgId}`,
+    hourMessage: "This key has reached its hourly request limit. Try again later.",
+    dayMessage: "Your organisation has reached its daily API limit. Try again tomorrow.",
+  });
 }
 
 export async function readBody(request: Request): Promise<Record<string, unknown>> {

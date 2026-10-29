@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const PRODUCT_ROUTES = [/^\/app(\/|$)/, /^\/api\/app\//, /^\/api\/v1\//, /^\/api\/jira\//, /^\/api\/cron\//, /^\/signin(\/|$)/, /^\/request-access(\/|$)/, /^\/auth\//, /^\/invite\//];
+const PRODUCT_ROUTES = [/^\/app(\/|$)/, /^\/api\/app\//, /^\/api\/v1\//, /^\/api\/mcp(\/|$)/, /^\/api\/jira\//, /^\/api\/cron\//, /^\/signin(\/|$)/, /^\/request-access(\/|$)/, /^\/auth\//, /^\/invite\//];
 const DEMO_ROUTES = [/^\/demo(\/|$)/, /^\/r\//, /^\/l\//, /^\/api\/records/, /^\/api\/locks/];
 
 const notFound = (request: NextRequest) => NextResponse.rewrite(new URL("/_kl-not-found", request.url));
@@ -27,8 +27,8 @@ export async function proxy(request: NextRequest) {
     }
   }
   if (path === "/") return NextResponse.redirect(new URL("/app", request.url));
-  // The public API uses API keys, Jira's webhook a signature and scheduled jobs a secret, not sign-in cookies.
-  if (path.startsWith("/api/v1/") || path.startsWith("/api/jira/") || path.startsWith("/api/cron/")) return NextResponse.next();
+  // The public API and MCP server use API keys, Jira's webhook a signature and scheduled jobs a secret, not sign-in cookies.
+  if (path.startsWith("/api/v1/") || path === "/api/mcp" || path.startsWith("/api/jira/") || path.startsWith("/api/cron/")) return NextResponse.next();
 
   const env = process.env;
   const url = env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL;
